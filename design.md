@@ -1,234 +1,234 @@
-# Interview Prep Buddy – Detailed Design Document
+# Interview Prep Buddy – Detailed Design Document (v2)
 
-## 1. Introduction
+## 1. Product Intent
 
-Interview Prep Buddy is an AI-powered mock interview platform designed to improve learning outcomes and interview readiness for students and job seekers. The system simulates real technical (DSA) and HR interviews using voice-based interaction and provides intelligent, structured feedback by evaluating the user's reasoning, communication, and problem-solving approach.
+Interview Prep Buddy is an AI-powered mock interview platform for technical (DSA) and HR preparation. The product focuses on three measurable outcomes:
+- Better answer quality across repeated mock interviews
+- Better speaking clarity and structure
+- Better interview confidence from realistic simulation
 
-The solution directly addresses the hackathon's objective of building an AI-driven system that improves learning efficiency and productivity through meaningful and responsible use of AI.
-
----
-
-## 2. Problem Context
-
-Interview preparation today is largely inefficient due to:
-- Static question banks
-- Rule-based or answer-only evaluation
-- Lack of feedback on reasoning and communication
-- No realistic interview simulation
-
-Real interviews assess _how candidates think and explain_, not just whether the final answer is correct. This creates a gap that traditional platforms fail to fill.
+The platform evaluates reasoning and communication quality, not only final correctness.
 
 ---
 
-## 3. Design Objectives
+## 2. Scope and Feature Boundaries
 
-The primary design objectives are:
-- Simulate real interview conditions
-- Evaluate reasoning instead of memorization
-- Provide actionable, structured feedback
-- Adapt interview difficulty dynamically
-- Ensure clarity, usability, and accessibility
-- Demonstrate meaningful and responsible AI usage
+### In Scope (MVP)
+- Email/password authentication
+- Interview mode selection: DSA, HR
+- Voice answer capture + speech-to-text
+- AI-led question asking
+- Structured scoring per answer
+- Adaptive difficulty and follow-up questions
+- End-of-session summary
+- Session history dashboard
 
----
-
-## 4. System Architecture Overview
-
-The system follows a modular, service-oriented architecture where AI components are embedded into the core evaluation and decision-making flow.
-
-### Core Layers:
-1. Presentation Layer (Frontend)
-2. Application Layer (Backend / API)
-3. AI Services Layer
-4. Data Storage Layer
-5. Authentication & Security Layer
-
-This separation ensures scalability, maintainability, and clear responsibility distribution across components.
+### Out of Scope (MVP)
+- Live video interview
+- Proctoring / cheating detection
+- Real-time coding editor with compiler
+- Enterprise SSO
 
 ---
 
-## 5. Component-Level Design
+## 3. Architecture Overview
 
-### 5.1 Frontend (Web / Mobile Application)
+The system uses a modular architecture with clean separation of concerns:
 
-Responsibilities:
-- User authentication and session handling
-- Interview mode selection (DSA / HR)
-- Voice input capture via microphone
-- Display of interview questions
-- Display of structured AI feedback
-- Performance summary and insights
+1. `client-app` (Web)
+2. `api-gateway` (REST API)
+3. `interview-engine` (state machine + orchestration)
+4. `ai-evaluator` (LLM scoring + feedback)
+5. `speech-service` (STT integration)
+6. `data-layer` (PostgreSQL + Redis)
+7. `observability` (logs, metrics, traces)
 
-Design Considerations:
-- Minimal and distraction-free UI
-- Clear visual separation between question and feedback
-- Beginner-friendly navigation
-- Responsive design for multiple devices
-
----
-
-### 5.2 Backend Server (API Layer)
-
-Responsibilities:
-- Orchestrate interview flow (state machine)
-- Manage communication between frontend and AI services
-- Handle interview session lifecycle
-- Store and retrieve user data
-- Enforce business logic and validation
-
-Key Backend Modules:
-- Interview Flow Manager
-- AI Orchestration Module
-- Feedback Formatter
-- Performance Tracker
+### Why this split
+- Keeps AI-related logic isolated and testable
+- Enables independent scaling of high-latency services (AI/STT)
+- Supports adding providers without rewriting core flow
 
 ---
 
-### 5.3 Interview Flow as a State Machine
+## 4. Runtime Flow
 
-The interview is modeled as a state machine to ensure clarity and control.
+### 4.1 Session Start
+1. User selects mode and target difficulty
+2. `interview-engine` initializes session context
+3. First question is generated from question bank + AI personalization
 
-States include:
-- Idle
-- Interview Initialization
-- Question Generation
-- Answer Capture
-- Evaluation
-- Feedback Delivery
-- Adaptive Decision
-- Interview Completion
+### 4.2 Per-Question Loop
+1. User records response (voice)
+2. `speech-service` converts audio to text
+3. `ai-evaluator` scores answer against rubric + reference solution
+4. `interview-engine` decides next action:
+   - Easier follow-up
+   - Same level reinforcement
+   - Harder next question
+5. Feedback snippet shown immediately
 
-This design ensures predictable behavior while allowing adaptive transitions based on AI evaluation results.
-
----
-
-### 5.4 Speech-to-Text Service
-
-Responsibilities:
-- Convert spoken user answers into text
-- Ensure accuracy suitable for reasoning evaluation
-
-Design Choice:
-Voice-based input is used to simulate real interview conditions and improve communication skills, which cannot be evaluated using typed input alone.
+### 4.3 Session End
+- Aggregate scoring and trend analysis
+- Generate strengths/improvement/suggestions summary
+- Persist session and answer-level analytics
 
 ---
 
-### 5.5 AI / LLM Evaluation Engine
+## 5. Interview State Machine
 
-This is the core intelligence of the system.
+States:
+- `IDLE`
+- `INIT`
+- `ASK_QUESTION`
+- `CAPTURE_AUDIO`
+- `TRANSCRIBE`
+- `EVALUATE`
+- `DELIVER_FEEDBACK`
+- `ADAPT`
+- `COMPLETE`
+- `FAILED`
 
-Responsibilities:
-- Understand open-ended natural language responses
-- Evaluate reasoning, logic flow, and explanation clarity
-- Compare responses against gold-standard solutions
-- Identify gaps, misconceptions, and strengths
-- Decide adaptive interview progression
+Transition guards:
+- Retry limits for STT and LLM calls
+- Timeout fallback path
+- Safety checks for empty/invalid transcript
 
-Why AI is Essential:
-- Open-ended answers cannot be evaluated using rules
-- Reasoning and communication require language understanding
-- Adaptive questioning requires contextual intelligence
-
----
-
-### 5.6 Feedback Generation Module
-
-Feedback is generated in a structured and constructive format:
-- Strengths: What the user did well
-- Improvements: Areas needing attention
-- Suggestions: Clear guidance for improvement
-
-This format ensures learning-oriented, non-judgmental feedback.
+Failure strategy:
+- Fail soft per question (skip with explanation)
+- Keep session alive when non-critical errors happen
+- Mark degraded quality in analytics
 
 ---
 
-### 5.7 Database Layer
+## 6. Scoring Framework (Core IP)
 
-Stores:
-- Interview questions (DSA & HR)
-- Gold-standard solutions
-- User interview history
-- Performance metrics and progress data
+Each answer is scored 0-5 in these dimensions.
 
-Design Principles:
-- Minimal data storage
-- Separation of user data and content data
-- Scalability for future analytics
+### DSA Rubric
+- Problem understanding
+- Approach quality
+- Correctness reasoning
+- Complexity analysis
+- Communication clarity
 
----
+### HR Rubric
+- Relevance to question
+- Structure (Situation/Task/Action/Result style)
+- Specific evidence/examples
+- Self-awareness and reflection
+- Communication clarity
 
-### 5.8 Authentication & Security
+### Weighting
+- DSA default: 20% each
+- HR default: 20% each
 
-Responsibilities:
-- Secure user login
-- Session management
-- Access control
+### Composite Score
+`composite = sum(dimension_score * dimension_weight)`
 
-Security Considerations:
-- No permanent storage of voice data
-- Secure API communication
-- Protection against unauthorized access
-
----
-
-## 6. AI Design Principles
-
-### 6.1 Meaningful Use of AI
-
-AI is used as:
-- A reasoning evaluator
-- A decision-maker for interview flow
-- A feedback generator
-
-It is not used as a simple chatbot or rule-based checker.
+Adaptive logic uses rolling score over last 2 questions to avoid noisy jumps.
 
 ---
 
-### 6.2 Responsible AI Design
+## 7. AI Prompting and Guardrails
 
-- Feedback is improvement-focused, not judgmental
-- Gold-standard references reduce hallucinations
-- No personal or sensitive voice data stored
-- Focus on logic and reasoning over language fluency bias
+Prompt inputs:
+- Interview mode and difficulty
+- Question metadata
+- Gold reference answer
+- Transcript
+- Previous question result
 
----
+Prompt outputs (strict JSON schema):
+- Numeric rubric scores
+- `strengths[]`
+- `improvements[]`
+- `next_question_strategy`
+- `confidence`
 
-## 7. Usability & User Experience Design
-
-- Simple interview flow with minimal steps
-- Voice-first interaction
-- Clear separation between interview and feedback
-- Beginner-friendly language and explanations
-
-The system is designed so that users can focus on thinking and speaking, not navigating complex interfaces.
-
----
-
-## 8. Scalability & Extensibility
-
-The architecture supports future enhancements such as:
-- Resume-based personalized interviews
-- Company-specific interview modes
-- Multilingual interviews
-- Advanced analytics and readiness scoring
-- Integration with learning platforms
+Guardrails:
+- JSON schema validation before persistence
+- Reject non-conforming AI responses and retry once
+- Neutral and constructive tone constraints
+- Avoid penalizing accent/grammar unless comprehension fails
 
 ---
 
-## 9. Constraints & Assumptions
+## 8. Data Model
 
-Constraints:
-- Hackathon time limits
-- Limited API usage (free tiers / credits)
-- Prototype-level deployment
+### Core Entities
+- `users`
+- `interview_sessions`
+- `questions`
+- `session_questions`
+- `answer_evaluations`
+- `user_progress_snapshots`
 
-Assumptions:
-- Users have microphone access
-- Internet connectivity is available
-- Demo-scale concurrent usage
+### Important Fields
+- `interview_sessions`: `mode`, `difficulty_start`, `difficulty_end`, `total_score`, `duration_sec`
+- `session_questions`: `question_text`, `difficulty`, `transcript`, `latency_ms`
+- `answer_evaluations`: dimension scores, `strengths_json`, `improvements_json`, `confidence`
+
+### Privacy
+- Audio blobs not stored permanently in MVP
+- Store transcript only (with user consent)
+- PII separation from evaluation data
 
 ---
 
-## 10. Conclusion
+## 9. API Contract (v1)
 
-Interview Prep Buddy is designed as a realistic, AI-driven interview preparation platform that focuses on improving reasoning, communication, and confidence. The system demonstrates meaningful AI usage, strong engineering design, and clear alignment with hackathon requirements.
+- `POST /auth/register`
+- `POST /auth/login`
+- `POST /sessions`
+- `POST /sessions/{id}/questions/next`
+- `POST /sessions/{id}/answers` (audio/transcript payload)
+- `GET /sessions/{id}/summary`
+- `GET /users/me/progress`
+
+API principles:
+- Idempotency keys for answer submission
+- Standard error envelope: `code`, `message`, `retryable`
+- Request-level tracing IDs
+
+---
+
+## 10. Performance and Reliability Targets
+
+- p95 question generation latency: <= 4s
+- p95 answer evaluation latency: <= 6s
+- Session completion success rate: >= 98%
+- STT error recovery without session drop: >= 95%
+
+---
+
+## 11. Security and Compliance Baseline
+
+- JWT access + rotating refresh tokens
+- Password hashing (Argon2id/bcrypt)
+- Rate limit on auth and answer endpoints
+- Encryption in transit (HTTPS)
+- Audit logs for auth + interview submission
+
+---
+
+## 12. Observability
+
+Key metrics:
+- `session_start_count`, `session_complete_count`
+- `ai_eval_latency_ms`, `stt_latency_ms`
+- `eval_retry_count`, `schema_validation_fail_count`
+- score improvement trend per user cohort
+
+Dashboards should separate product metrics (learning outcomes) from infra metrics (latency, errors).
+
+---
+
+## 13. Extension Path (Beyond MVP)
+
+- Resume-aware personalized interviews
+- Company role templates (SDE-1, PM, Analyst)
+- Multi-lingual support
+- Real-time interview coach hints
+- Team mode for college training cells
+
+This design supports scaling by adding new question providers and evaluation rubrics without changing session orchestration.

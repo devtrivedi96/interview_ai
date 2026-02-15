@@ -1,124 +1,165 @@
-# Interview Prep Buddy – Requirements Document
+# Interview Prep Buddy – Requirements Specification (v2)
 
-## 1. Functional Requirements
+## 1. Product Goals
 
-### FR-1: User Authentication
+- Improve candidate interview readiness with measurable progress
+- Provide realistic interview simulation through voice-first interaction
+- Deliver actionable, rubric-based feedback after each answer
 
-- Users must be able to log in securely
-- Sessions should be managed safely
+## 2. Personas
 
-### FR-2: Interview Type Selection
+- Student preparing for internship interviews
+- Early-career engineer preparing for DSA rounds
+- Job seeker preparing for HR/behavioral interviews
 
-- Users can select between DSA and HR interviews
+## 3. Functional Requirements
 
-### FR-3: AI Question Generation
+### FR-1 Authentication and Profile
+- Users can register/login securely
+- Users can view profile and interview history
 
-- System should generate relevant interview questions
-- Questions should align with selected interview type
+Acceptance Criteria:
+- Login success and failure paths are handled
+- Session persists across refresh with valid token
 
-### FR-4: Voice-Based Answer Input
+### FR-2 Interview Configuration
+- User selects mode (`DSA`/`HR`), duration, and difficulty
 
-- Users can answer questions using voice input
-- System must capture and process audio input
+Acceptance Criteria:
+- Selected config is stored in session metadata
 
-### FR-5: Speech-to-Text Conversion
+### FR-3 Question Delivery
+- System generates or selects context-appropriate questions
+- Follow-up question should depend on prior answer quality
 
-- Voice input must be converted into text accurately
+Acceptance Criteria:
+- At least one adaptive transition occurs in a 20-minute session
 
-### FR-6: AI Evaluation
+### FR-4 Voice Answer Capture
+- User records answer through browser mic
+- Client uploads audio stream/file safely
 
-- System must evaluate:
-  - Reasoning and logic flow
-  - Correctness of approach
-  - Communication clarity
-  - Time and space complexity (for DSA)
+Acceptance Criteria:
+- Browser permission denial is gracefully handled
 
-### FR-7: Structured Feedback
+### FR-5 Speech-to-Text
+- Audio is transcribed with punctuation and sentence boundaries
 
-- Feedback must be generated in a clear and structured format
-- Suggestions for improvement must be provided
+Acceptance Criteria:
+- Transcription failure returns retry path without ending session
 
-### FR-8: Adaptive Interview Flow
+### FR-6 AI Evaluation and Scoring
+- System evaluates answer with rubric dimensions
+- DSA includes correctness and complexity reasoning
+- HR includes structure and evidence quality
 
-- System must adjust question difficulty based on user performance
+Acceptance Criteria:
+- Evaluation response includes per-dimension scores and rationale
 
-### FR-9: Performance Summary
+### FR-7 Structured Feedback
+- Feedback includes strengths, improvements, and next-step drills
 
-- System should provide an interview summary at the end
+Acceptance Criteria:
+- Every evaluated answer returns all 3 sections
 
----
+### FR-8 Adaptive Flow
+- Difficulty adjusts up/down based on rolling performance
 
-## 2. Non-Functional Requirements
+Acceptance Criteria:
+- Adaptive decision is logged with reason code
 
-### NFR-1: Usability
+### FR-9 Session Summary
+- End summary includes score trends, weak dimensions, and action plan
 
-- Interface must be simple and intuitive
-- Suitable for beginners and non-technical users
+Acceptance Criteria:
+- Summary generated for >= 98% completed sessions
 
-### NFR-2: Performance
+### FR-10 Progress Tracking
+- User can view progress over time per mode and dimension
 
-- AI feedback should be generated within acceptable response time
-
-### NFR-3: Scalability
-
-- System should scale with increased users and interviews
-
-### NFR-4: Reliability
-
-- System should handle failures gracefully (API errors, network issues)
-
-### NFR-5: Security
-
-- Secure authentication and data handling
-- No permanent storage of voice data
-
----
-
-## 3. AI-Specific Requirements
-
-### AI-1: Meaningful Use of AI
-
-- AI must be central to evaluation and decision-making
-- AI must not be used only as a chatbot or rule-based checker
-
-### AI-2: Justification of AI Usage
-
-- Open-ended interview answers require AI-level language understanding
-- Rule-based systems are insufficient
-
-### AI-3: Responsible AI
-
-- Constructive feedback only
-- Bias reduction using reference solutions
-- No misuse of user data
+Acceptance Criteria:
+- Dashboard shows last 10 sessions and moving average
 
 ---
 
-## 4. Technical Requirements
+## 4. Non-Functional Requirements
 
-- Frontend: Web or Mobile Application
-- Backend: API-based server
-- AI Services:
-  - Large Language Model (LLM)
-  - Speech-to-Text API
-- Database:
-  - Questions
-  - Gold-standard solutions
-  - User performance data
-- Cloud hosting using free-tier services
+### NFR-1 Usability
+- Simple, low-friction UX suitable for first-time users
+
+### NFR-2 Performance
+- p95 per-answer feedback latency <= 6 seconds
+
+### NFR-3 Reliability
+- Graceful degradation for AI/STT failures
+- No hard crash during active session
+
+### NFR-4 Scalability
+- Support at least 500 daily active users in MVP infra
+
+### NFR-5 Security
+- Secure auth, encrypted transport, basic abuse controls
+
+### NFR-6 Observability
+- Error rates and latency by service are measurable
 
 ---
 
-## 5. Constraints
+## 5. AI Requirements
 
-- Hackathon time limits
-- Limited API usage (free tiers / credits)
-- Prototype-level implementation
+### AI-1 Centrality
+- AI is required for evaluation, adaptation, and feedback generation
+
+### AI-2 Structured Outputs
+- LLM outputs must follow strict JSON schema
+
+### AI-3 Responsible Feedback
+- Tone is constructive and bias-aware
+- Do not penalize accent/fluency where reasoning is clear
+
+### AI-4 Explainability
+- Every adaptive jump includes machine-readable reason code
 
 ---
 
-## 6. Assumptions
+## 6. Data and Privacy Requirements
 
-- Users have microphone access
-- Internet connectivity is available
-- Demo-scale usage during hackathon
+- No permanent storage of raw voice audio in MVP
+- Transcript retention configurable per user consent
+- Separate user identity data from evaluation artifacts
+
+---
+
+## 7. KPIs
+
+- Session completion rate
+- Average score improvement over 4 sessions
+- Weekly returning users
+- p95 evaluation latency
+- Feedback usefulness rating (1-5)
+
+---
+
+## 8. Release Scope
+
+### MVP (Hackathon)
+- Auth, session flow, voice/STT, AI evaluation, summary, basic dashboard
+
+### Post-MVP
+- Resume-aware question personalization
+- Company-specific interview packs
+- Multi-language mode
+- Peer/team practice spaces
+
+---
+
+## 9. Constraints
+
+- Limited API credits
+- Small engineering team
+- Prototype deployment budget
+
+## 10. Assumptions
+
+- Users have stable internet and mic access
+- External AI/STT providers are available during usage window
