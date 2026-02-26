@@ -10,7 +10,7 @@ from db.models import (
     InterviewSession, SessionQuestion, Question,
     AnswerEvaluation, SessionState, InterviewMode
 )
-from db.aws_client import get_db, Collections
+from db.firebase_client import get_db, Collections
 from session_engine.state_machine import SessionStateMachine
 from utils.config import settings
 

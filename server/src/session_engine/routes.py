@@ -7,9 +7,9 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
-from db.aws_client import get_db, Collections
+from db.firebase_client import get_db, Collections
 from db.models import User, InterviewSession, SessionState, InterviewMode
-from auth.security import get_current_user, require_audio_consent
+from auth.security import get_current_user_firebase, require_audio_consent
 from session_engine.engine import InterviewEngine
 from session_engine.state_machine import SessionStateMachine
 from stt_adapter.service import STTService
@@ -32,7 +32,7 @@ class AnswerSubmit(BaseModel):
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_session(
     session_data: SessionCreate,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_firebase)
 ):
     """
     Create a new interview session
@@ -82,7 +82,7 @@ async def create_session(
 @router.post("/{session_id}/start")
 async def start_session(
     session_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_firebase)
 ):
     """
     Start the interview session
@@ -114,7 +114,7 @@ async def start_session(
 @router.post("/{session_id}/questions/next")
 async def get_next_question(
     session_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_firebase)
 ):
     """
     Get next question for the session
@@ -230,7 +230,7 @@ async def submit_answer(
 @router.get("/{session_id}/summary")
 async def get_session_summary(
     session_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_firebase)
 ):
     """
     Get comprehensive session summary
@@ -257,7 +257,7 @@ async def get_session_summary(
 @router.post("/{session_id}/complete")
 async def complete_session(
     session_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_firebase)
 ):
     """
     Mark session as complete
@@ -288,7 +288,7 @@ async def complete_session(
 
 @router.get("")
 async def list_sessions(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_firebase),
     limit: int = 10
 ):
     """List user's interview sessions"""
