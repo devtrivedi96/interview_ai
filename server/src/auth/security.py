@@ -1,13 +1,14 @@
 """
 Security utilities
-Token validation and authenticated user resolution (Cognito/local)
+Firebase token validation and authenticated user resolution
 """
 from datetime import datetime
 from typing import Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from auth import aws_auth as aws_auth
+import firebase_admin
+from firebase_admin import auth as firebase_auth
 from db.aws_client import Collections, get_db
 from db.models import User
 from passlib.hash import sha256_crypt
@@ -23,7 +24,7 @@ async def get_current_user(
 ) -> User:
     """
     Dependency to get current authenticated user.
-    Validates Firebase ID token and retrieves the user profile from Firestore.
+    Validates Firebase custom token and retrieves the user profile from database.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -108,3 +109,65 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
+
+
+
+async def get_current_user_firebase(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> User:
+    """
+    Dependency to get current authenticated user using Firebase Auth
+    
+    Validates Firebase ID token and retrieves user from Firestore
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    try:
+        token = credentials.credentials
+        
+        # Import here to avoid circular dependency
+        from auth import firebase_auth
+        
+        # Verify Firebase ID token
+        decoded_token = firebase_auth.verify_id_token(token)
+        user_id = decoded_token.get("uid")
+        
+        if user_id is None:
+            raise credentials_exception
+            
+    except Exception:
+        raise credentials_exception
+    
+    # Get user from Firestore
+    db = get_firebase_db()
+    user_doc = db.collection(FirebaseCollections.USERS).document(user_id).get()
+    
+    if not user_doc.exists:
+        email = decoded_token.get("email")
+        if not email:
+            raise credentials_exception
+        now = datetime.utcnow()
+        db.collection(FirebaseCollections.USERS).document(user_id).set(
+            {
+                "email": email,
+                "email_verified": bool(decoded_token.get("email_verified", False)),
+                "audio_consent": False,
+                "created_at": now,
+                "last_login": now,
+                "profile": {},
+            }
+        )
+        user_doc = db.collection(FirebaseCollections.USERS).document(user_id).get()
+
+    user_data = user_doc.to_dict() or {}
+    if not user_data.get("created_at"):
+        user_data["created_at"] = datetime.utcnow()
+
+    try:
+        return User.from_dict(user_doc.id, user_data)
+    except Exception:
+        raise credentials_exception

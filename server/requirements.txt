@@ -6,9 +6,16 @@ python-multipart==0.0.6
 # Data Validation
 pydantic==2.5.3
 pydantic-settings==2.1.0
+email-validator>=2.1.0
 
-# AWS
-boto3==1.30.0
+# Firebase (for authentication & email verification)
+firebase-admin>=6.0.0
+
+# AWS (for database)
+boto3>=1.26.0
+
+# HTTP Client for email API
+requests>=2.31.0
 
 # Authentication & Security
 python-jose[cryptography]==3.3.0

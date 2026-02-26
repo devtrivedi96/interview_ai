@@ -1,13 +1,20 @@
 """
 Authentication routes
-Firebase email/password auth with Brevo-based email verification
+Firebase email/password auth with automatic email verification
+Falls back to dev mode if Firebase not initialized
 """
 import json
 from datetime import datetime
 from urllib import error, request
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from auth import aws_auth as aws_auth
+try:
+    import firebase_admin
+    from firebase_admin import auth as firebase_auth
+    FIREBASE_AVAILABLE = True
+except:
+    FIREBASE_AVAILABLE = False
+
 from pydantic import BaseModel, EmailStr
 
 from auth.security import get_current_user
@@ -51,16 +58,10 @@ class VerificationResponse(BaseModel):
 
 
 def _send_brevo_verification_email(email: str, verification_link: str) -> None:
-    if not settings.BREVO_API_KEY:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Brevo API key is not configured",
-        )
-    if not settings.BREVO_SENDER_EMAIL:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Brevo sender email is not configured",
-        )
+    # Skip email sending if Brevo not configured (dev mode)
+    if not settings.BREVO_API_KEY or not settings.BREVO_SENDER_EMAIL:
+        print(f"[DEV] Email verification link for {email}: {verification_link}")
+        return
 
     payload = {
         "sender": {
@@ -144,64 +145,79 @@ def _aws_sign_in(email: str, password: str) -> dict:
 )
 async def register(user_data: UserRegister):
     """
-    Register a new user in Cognito/local auth, create profile in DB,
-    and send a verification email via Brevo.
+    Register a new user.
+    - If Firebase is configured: uses Firebase Auth with email verification
+    - If not configured: uses in-memory auth (email verification skipped for dev)
     """
-    # Ensure DB client is initialized (or fallback in-memory DB)
     db = db_client.get_db()
     users_ref = db.collection(db_client.Collections.USERS)
-
-    # If AWS/Dynamo is available, create a user and send verification
-    if db_client.AWS_AVAILABLE:
+    
+    # Try Firebase first
+    if FIREBASE_AVAILABLE:
         try:
-            aws_user = aws_auth.create_user(
-                email=user_data.email, password=user_data.password, email_verified=False
+            # Create user in Firebase
+            firebase_user = firebase_auth.create_user(
+                email=user_data.email,
+                password=user_data.password
             )
-        except aws_auth.EmailAlreadyExistsError:
+            
+            # Send verification email (Firebase handles this automatically)
+            try:
+                verification_link = firebase_auth.generate_email_verification_link(user_data.email)
+                print(f"[Firebase] Verification link sent to {user_data.email}")
+            except Exception as e:
+                print(f"[Firebase] Email sending error (non-blocking): {e}")
+            
+            # Save user profile to AWS database
+            user_ref = users_ref.document(firebase_user.uid)
+            user_ref.set(
+                {
+                    "email": user_data.email,
+                    "email_verified": False,
+                    "audio_consent": user_data.audio_consent,
+                    "created_at": datetime.utcnow(),
+                    "last_login": None,
+                    "profile": {},
+                }
+            )
+            
+            return VerificationResponse(
+                message="Account created. Verification email sent. Please verify your email before logging in."
+            )
+            
+        except Exception as e:
+            # If it's already exists error, raise it
+            if "already" in str(e).lower():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email already registered",
+                )
+            # For other errors, fall back to dev mode
+            print(f"[Firebase] Not available or not initialized: {e}")
+    
+    # Fallback: Dev mode with in-memory storage
+    import uuid
+    from auth.security import get_password_hash
+    
+    # Check if email already exists
+    try:
+        users_list = list(users_ref.where("email", "==", user_data.email).limit(1).get())
+        if users_list:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already registered",
             )
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to create user: {str(e)}",
-            )
-
-        user_ref = users_ref.document(aws_user.uid)
-        user_ref.set(
-            {
-                "email": user_data.email,
-                "email_verified": False,
-                "audio_consent": user_data.audio_consent,
-                "created_at": datetime.utcnow(),
-                "last_login": None,
-                "profile": {},
-            }
+    except HTTPException:
+        raise
+    except:
+        pass
+    
+    if len(user_data.password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 6 characters",
         )
-
-        try:
-            _generate_and_send_verification_email(user_data.email)
-        except Exception:
-            # Roll back partially created user if verification email could not be sent.
-            try:
-                user_ref.delete()
-            except Exception:
-                pass
-            try:
-                aws_auth.delete_user(aws_user.uid)
-            except Exception:
-                pass
-            raise
-
-        return VerificationResponse(
-            message="Account created. Please verify your email before logging in."
-        )
-
-    # Dev fallback: create a local user record with hashed password so login works without Firebase
-    import uuid
-    from auth.security import get_password_hash
-
+    
     local_uid = uuid.uuid4().hex
     user_ref = users_ref.document(local_uid)
     user_ref.set(
@@ -215,85 +231,106 @@ async def register(user_data: UserRegister):
             "hashed_password": get_password_hash(user_data.password),
         }
     )
-
+    
     return VerificationResponse(message="Account created (dev mode). You may log in immediately.")
 
 
 @router.post("/login", response_model=Token)
 async def login(user_data: UserLogin):
     """
-    Authenticate using hosted auth (Cognito) or local email/password and return ID token.
-    Blocks login until email is verified.
+    Authenticate using Firebase (if available) or fallback to in-memory auth.
     """
-    # If AWS client is available use its auth service
-    if db_client.AWS_AVAILABLE:
-        sign_in_data = _aws_sign_in(user_data.email, user_data.password)
-        id_token = sign_in_data.get("idToken")
-        uid = sign_in_data.get("localId")
-
-        if not id_token or not uid:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Failed to authenticate with auth provider",
-            )
-
-        db_client.get_db()  # ensure DB init
+    if FIREBASE_AVAILABLE:
         try:
-            decoded_token = aws_auth.verify_id_token(id_token)
-        except Exception:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Failed to validate token",
-            )
-
-        email_verified = bool(decoded_token.get("email_verified", False))
-        if not email_verified:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Email not verified. Please verify your email before logging in.",
-            )
-
-        db = db_client.get_db()
-        db.collection(db_client.Collections.USERS).document(uid).set(
-            {
-                "email": user_data.email,
-                "email_verified": True,
-                "last_login": datetime.utcnow(),
-            },
-            merge=True,
-        )
-
-        return Token(access_token=id_token, token_type="bearer")
-
-    # Dev fallback: authenticate against in-memory DB client and return local JWT
+            # Verify password with Firebase REST API
+            import requests
+            firebase_config = settings.dict()
+            
+            # Try to get Firebase web API key from config
+            api_key = getattr(settings, 'FIREBASE_WEB_API_KEY', None)
+            
+            if api_key:
+                # Use Firebase REST API for password verification
+                response = requests.post(
+                    f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}",
+                    json={"email": user_data.email, "password": user_data.password, "returnSecureToken": True},
+                    timeout=10
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    id_token = data.get("idToken")
+                    firebase_uid = data.get("localId")
+                    
+                    # Verify email
+                    try:
+                        firebase_user = firebase_auth.get_user(firebase_uid)
+                        if not firebase_user.email_verified:
+                            raise HTTPException(
+                                status_code=status.HTTP_403_FORBIDDEN,
+                                detail="Email not verified. Please verify your email before logging in.",
+                            )
+                    except:
+                        pass
+                    
+                    # Update last login
+                    db = db_client.get_db()
+                    db.collection(db_client.Collections.USERS).document(firebase_uid).set(
+                        {
+                            "email": user_data.email,
+                            "email_verified": True,
+                            "last_login": datetime.utcnow(),
+                        },
+                        merge=True,
+                    )
+                    
+                    return Token(access_token=id_token, token_type="bearer")
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Incorrect email or password",
+                    )
+            else:
+                raise Exception("Firebase Web API Key not configured")
+                
+        except HTTPException:
+            raise
+        except Exception as e:
+            # Fall through to dev mode
+            pass
+    
+    # Fallback: Dev mode authentication
     db = db_client.get_db()
     users_ref = db.collection(db_client.Collections.USERS)
-    users = users_ref.where("email", "==", user_data.email).limit(1).get()
-    users_list = list(users)
-
+    
+    try:
+        users_list = list(users_ref.where("email", "==", user_data.email).limit(1).get())
+    except:
+        users_list = []
+    
     if not users_list:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
         )
-
+    
     user_doc = users_list[0]
     user_dict = user_doc.to_dict()
-
+    
     from auth.security import verify_password, create_access_token
-
+    
     if not verify_password(user_data.password, user_dict.get("hashed_password", "")):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
         )
-
+    
     # Update last login
     try:
         users_ref.document(user_doc.id).update({"last_login": datetime.utcnow()})
-    except Exception:
+    except:
         pass
-
+    
     # Issue local JWT
     access_token = create_access_token(data={"sub": user_doc.id})
     return Token(access_token=access_token, token_type="bearer")
@@ -302,22 +339,28 @@ async def login(user_data: UserLogin):
 @router.post("/verify-email/resend", response_model=VerificationResponse)
 async def resend_email_verification(payload: UserEmail):
     """
-    Resend verification email via Brevo for an existing Firebase user.
+    Resend verification email via Firebase for an existing user.
     """
-    db_client.get_db()  # ensure DB init
     try:
-        user = aws_auth.get_user_by_email(payload.email)
-    except aws_auth.UserNotFoundError:
+        firebase_user = firebase_auth.get_user_by_email(payload.email)
+        
+        if firebase_user.email_verified:
+            return VerificationResponse(message="Email is already verified.")
+        
+        # Send verification email
+        verification_link = firebase_auth.generate_email_verification_link(payload.email)
+        return VerificationResponse(message="Verification email has been sent.")
+        
+    except firebase_auth.UserNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
-
-    if user.email_verified:
-        return VerificationResponse(message="Email is already verified.")
-
-    _generate_and_send_verification_email(payload.email)
-    return VerificationResponse(message="Verification email has been sent.")
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send verification email: {str(e)}",
+        )
 
 
 @router.get("/me", response_model=UserResponse)

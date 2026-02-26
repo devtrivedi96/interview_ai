@@ -1,15 +1,15 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
-import { Mic } from 'lucide-react'
+import { Mic, Mail, CheckCircle } from 'lucide-react'
 
 export default function Register() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [audioConsent, setAudioConsent] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showSuccess, setShowSuccess] = useState(false)
   
   const { register } = useAuthStore()
   const navigate = useNavigate()
@@ -17,18 +17,84 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    setSuccess('')
     setLoading(true)
 
     try {
-      const response = await register(email, password, audioConsent)
-      setSuccess(response.message || 'Account created. Please verify your email before logging in.')
-      setTimeout(() => navigate('/login'), 1200)
+      const result = await register(email, password, audioConsent)
+      
+      if (result.needsVerification) {
+        setShowSuccess(true)
+      } else {
+        navigate('/dashboard')
+      }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Registration failed. Please try again.')
+      setError(err.message || 'Registration failed. Please try again.')
     } finally {
       setLoading(false)
     }
+  }
+
+  if (showSuccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-blue-100 py-12 px-4">
+        <div className="max-w-md w-full">
+          <div className="card text-center">
+            <div className="flex justify-center mb-6">
+              <div className="bg-green-100 rounded-full p-4">
+                <CheckCircle className="w-16 h-16 text-green-600" />
+              </div>
+            </div>
+            
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              Check Your Email!
+            </h2>
+            
+            <div className="bg-blue-50 rounded-lg p-4 mb-6">
+              <Mail className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+              <p className="text-gray-700 mb-2">
+                We've sent a verification email to:
+              </p>
+              <p className="font-semibold text-gray-900">{email}</p>
+            </div>
+            
+            <div className="text-left space-y-3 mb-6">
+              <p className="text-sm text-gray-600">
+                <strong>Next steps:</strong>
+              </p>
+              <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
+                <li>Check your email inbox (and spam folder)</li>
+                <li>Click the verification link in the email</li>
+                <li>Return here to log in</li>
+              </ol>
+            </div>
+            
+            <div className="space-y-3">
+              <button
+                onClick={() => navigate('/login')}
+                className="btn-primary w-full"
+              >
+                Go to Login
+              </button>
+              
+              <button
+                onClick={() => {
+                  setShowSuccess(false)
+                  setEmail('')
+                  setPassword('')
+                }}
+                className="btn-secondary w-full"
+              >
+                Register Another Account
+              </button>
+            </div>
+            
+            <p className="text-xs text-gray-500 mt-6">
+              Didn't receive the email? Check your spam folder or try registering again.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -76,28 +142,25 @@ export default function Register() {
               </p>
             </div>
 
-            <div className="flex items-start">
-              <input
-                type="checkbox"
-                id="audioConsent"
-                checked={audioConsent}
-                onChange={(e) => setAudioConsent(e.target.checked)}
-                className="mt-1 mr-2"
-              />
-              <label htmlFor="audioConsent" className="text-sm text-gray-700">
-                I consent to audio recording for interview practice. Audio will be retained for 30 days.
-              </label>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start">
+                <input
+                  type="checkbox"
+                  id="audioConsent"
+                  checked={audioConsent}
+                  onChange={(e) => setAudioConsent(e.target.checked)}
+                  className="mt-1 mr-3"
+                />
+                <label htmlFor="audioConsent" className="text-sm text-gray-700">
+                  <strong>Audio Recording Consent:</strong> I consent to audio recording for interview practice. 
+                  Audio will be retained for 30 days and used only for evaluation purposes.
+                </label>
+              </div>
             </div>
 
             {error && (
               <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
                 {error}
-              </div>
-            )}
-
-            {success && (
-              <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm">
-                {success}
               </div>
             )}
 
@@ -116,6 +179,13 @@ export default function Register() {
               <Link to="/login" className="text-primary-600 hover:text-primary-700 font-medium">
                 Login
               </Link>
+            </p>
+          </div>
+          
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <p className="text-xs text-gray-500 text-center">
+              By creating an account, you agree to receive email notifications including 
+              account verification and interview session updates.
             </p>
           </div>
         </div>

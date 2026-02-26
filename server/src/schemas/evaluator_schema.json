@@ -14,19 +14,82 @@
   "properties": {
     "scores": {
       "type": "object",
-      "required": ["dimension_1", "dimension_2", "dimension_3", "dimension_4", "dimension_5"],
+      "description": "Per-dimension rubric scores (0-5 scale)",
+      "required": [
+        "dimension_1",
+        "dimension_2",
+        "dimension_3",
+        "dimension_4",
+        "dimension_5"
+      ],
       "properties": {
-        "dimension_1": {"type": "number", "minimum": 0, "maximum": 5},
-        "dimension_2": {"type": "number", "minimum": 0, "maximum": 5},
-        "dimension_3": {"type": "number", "minimum": 0, "maximum": 5},
-        "dimension_4": {"type": "number", "minimum": 0, "maximum": 5},
-        "dimension_5": {"type": "number", "minimum": 0, "maximum": 5}
-      }
+        "dimension_1": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "dimension_2": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "dimension_3": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "dimension_4": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "dimension_5": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5
+        }
+      },
+      "additionalProperties": false
     },
-    "composite_score": {"type": "number", "minimum": 0, "maximum": 5},
-    "strengths": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 5},
-    "improvements": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 5},
-    "next_question_strategy": {"type": "string", "enum": ["easier", "same", "harder"]},
-    "eval_confidence": {"type": "number", "minimum": 0, "maximum": 1}
-  }
+    "composite_score": {
+      "type": "number",
+      "description": "Weighted average of all dimension scores",
+      "minimum": 0,
+      "maximum": 5
+    },
+    "strengths": {
+      "type": "array",
+      "description": "List of specific strengths observed",
+      "items": {
+        "type": "string",
+        "minLength": 10,
+        "maxLength": 200
+      },
+      "minItems": 1,
+      "maxItems": 5
+    },
+    "improvements": {
+      "type": "array",
+      "description": "List of specific areas for improvement",
+      "items": {
+        "type": "string",
+        "minLength": 10,
+        "maxLength": 200
+      },
+      "minItems": 1,
+      "maxItems": 5
+    },
+    "next_question_strategy": {
+      "type": "string",
+      "description": "Recommended difficulty adjustment",
+      "enum": ["easier", "same", "harder"]
+    },
+    "eval_confidence": {
+      "type": "number",
+      "description": "Evaluator confidence in the assessment (0-1)",
+      "minimum": 0,
+      "maximum": 1
+    }
+  },
+  "additionalProperties": false
 }

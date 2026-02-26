@@ -24,6 +24,95 @@ class Collections:
 _db_client: Optional[object] = None
 
 
+def _build_in_memory_db():
+    """Build an in-memory DB fallback client."""
+    class _InMemoryDoc:
+        def __init__(self, id, data):
+            self.id = id
+            self._data = data
+
+        def to_dict(self):
+            return self._data
+
+        @property
+        def exists(self):
+            return True
+
+    class _InMemoryCollection:
+        def __init__(self, store, name):
+            self.store = store
+            self.name = name
+
+        def document(self, doc_id: Optional[str] = None):
+            if doc_id is None:
+                import uuid
+                doc_id = uuid.uuid4().hex
+            self.store.setdefault(self.name, {})
+            if doc_id not in self.store[self.name]:
+                self.store[self.name][doc_id] = {}
+
+            class _DocRef:
+                def __init__(self, store, name, id):
+                    self._store = store
+                    self._name = name
+                    self.id = id
+
+                def set(self, data, merge: bool = False):
+                    if merge:
+                        self._store[self._name].setdefault(self.id, {})
+                        self._store[self._name][self.id].update(data)
+                    else:
+                        self._store[self._name][self.id] = data
+
+                def update(self, data):
+                    self._store[self._name].setdefault(self.id, {})
+                    self._store[self._name][self.id].update(data)
+
+                def get(self):
+                    data = self._store[self._name].get(self.id)
+                    if data is None:
+                        return type('X', (), {'exists': False, 'to_dict': lambda: {}})()
+                    return _InMemoryDoc(self.id, data)
+
+            return _DocRef(self.store, self.name, doc_id)
+
+        def where(self, field, op, value):
+            store = self.store
+            name = self.name
+
+            class _Query:
+                def __init__(self, store, name, field, value):
+                    self._store = store
+                    self._name = name
+                    self._field = field
+                    self._value = value
+                    self._limit = None
+
+                def limit(self, n):
+                    self._limit = n
+                    return self
+
+                def get(self):
+                    results = []
+                    for doc_id, data in list(self._store.get(self._name, {}).items()):
+                        if data.get(self._field) == self._value:
+                            results.append(_InMemoryDoc(doc_id, data))
+                            if self._limit and len(results) >= self._limit:
+                                break
+                    return results
+
+            return _Query(store, name, field, value)
+
+    class _InMemoryDB:
+        def __init__(self):
+            self._store = {}
+
+        def collection(self, name):
+            return _InMemoryCollection(self._store, name)
+
+    return _InMemoryDB()
+
+
 def get_db():
     """Return a DB client. Uses DynamoDB when available, otherwise an in-memory fallback."""
     global _db_client, AWS_AVAILABLE
@@ -31,92 +120,7 @@ def get_db():
         return _db_client
 
     if boto3 is None:
-        # In-memory fallback similar to previous Firebase fallback
-        class _InMemoryDoc:
-            def __init__(self, id, data):
-                self.id = id
-                self._data = data
-
-            def to_dict(self):
-                return self._data
-
-            @property
-            def exists(self):
-                return True
-
-        class _InMemoryCollection:
-            def __init__(self, store, name):
-                self.store = store
-                self.name = name
-
-            def document(self, doc_id: Optional[str] = None):
-                if doc_id is None:
-                    import uuid
-                    doc_id = uuid.uuid4().hex
-                self.store.setdefault(self.name, {})
-                if doc_id not in self.store[self.name]:
-                    self.store[self.name][doc_id] = {}
-
-                class _DocRef:
-                    def __init__(self, store, name, id):
-                        self._store = store
-                        self._name = name
-                        self.id = id
-
-                    def set(self, data, merge: bool = False):
-                        if merge:
-                            self._store[self._name].setdefault(self.id, {})
-                            self._store[self._name][self.id].update(data)
-                        else:
-                            self._store[self._name][self.id] = data
-
-                    def update(self, data):
-                        self._store[self._name].setdefault(self.id, {})
-                        self._store[self._name][self.id].update(data)
-
-                    def get(self):
-                        data = self._store[self._name].get(self.id)
-                        if data is None:
-                            return type('X', (), {'exists': False, 'to_dict': lambda: {}})()
-                        return _InMemoryDoc(self.id, data)
-
-                return _DocRef(self.store, self.name, doc_id)
-
-            def where(self, field, op, value):
-                store = self.store
-                name = self.name
-
-                class _Query:
-                    def __init__(self, store, name, field, value):
-                        self._store = store
-                        self._name = name
-                        self._field = field
-                        self._value = value
-                        self._limit = None
-
-                    def limit(self, n):
-                        self._limit = n
-                        return self
-
-                    def get(self):
-                        results = []
-                        for doc_id, data in list(self._store.get(self._name, {}).items()):
-                            if data.get(self._field) == self._value:
-                                results.append(_InMemoryDoc(doc_id, data))
-                                if self._limit and len(results) >= self._limit:
-                                    break
-                        return results
-
-                return _Query(store, name, field, value)
-
-        class _InMemoryDB:
-            def __init__(self):
-                self._store = {}
-
-            def collection(self, name):
-                return _InMemoryCollection(self._store, name)
-
-        _db_client = _InMemoryDB()
+        _db_client = _build_in_memory_db()
         AWS_AVAILABLE = False
         return _db_client
 
@@ -124,7 +128,9 @@ def get_db():
     region = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION")
     if not region:
         logger.warning("AWS region not configured; using in-memory DB fallback.")
-        return get_db()
+        _db_client = _build_in_memory_db()
+        AWS_AVAILABLE = False
+        return _db_client
 
     try:
         dynamo = boto3.resource("dynamodb", region_name=region)
@@ -219,4 +225,5 @@ def get_db():
     except Exception as e:
         logger.warning(f"Failed to initialize DynamoDB client: {e}. Falling back to in-memory.")
         AWS_AVAILABLE = False
-        return get_db()
+        _db_client = _build_in_memory_db()
+        return _db_client
