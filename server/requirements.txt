@@ -1,9 +1,24 @@
+# Core Framework
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# Data Validation
 pydantic==2.5.3
 pydantic-settings==2.1.0
+
+# AWS
+boto3==1.30.0
+
+# Authentication & Security
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-python-multipart==0.0.6
+
+# AI Services
 openai==1.10.0
-firebase-admin==6.4.0
+
+# JSON Schema Validation
+jsonschema==4.20.0
+
+# Utilities
+python-dateutil==2.8.2

@@ -1,7 +1,73 @@
-node_modules/
-dist/
+# --- Environments & secrets ---
 .env
+.env.local
+.env.*.local
+*.local
 server/.env
+client/.env
+
+# --- Credentials / cloud keys ---
+firebase-credentials.json
 server/firebase-credentials.json
-/.idea
-.vscode
+*-firebase-adminsdk-*.json
+
+# --- Node / frontend ---
+node_modules/
+client/node_modules/
+dist/
+dist-ssr/
+coverage/
+.vite/
+
+# --- Python / backend ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+server/.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Build artifacts ---
+build/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# --- Logs / runtime ---
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.pid
+*.pid.lock
+
+# --- Local DB / OS / editor ---
+*.db
+*.sqlite
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo
+*~
