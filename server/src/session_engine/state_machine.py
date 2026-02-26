@@ -7,7 +7,7 @@ from datetime import datetime
 import logging
 
 from db.models import SessionState, InterviewSession
-from db.aws_client import get_db, Collections
+from db.firebase_client import get_db, Collections
 
 logger = logging.getLogger(__name__)
 
