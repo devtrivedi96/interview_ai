@@ -5,11 +5,13 @@
 *.local
 server/.env
 client/.env
-
-# --- Credentials / cloud keys ---
+server/.env.example
 firebase-credentials.json
 server/firebase-credentials.json
 *-firebase-adminsdk-*.json
+aws-credentials.json
+.aws-credentials
+.aws/credentials
 
 # --- Node / frontend ---
 node_modules/

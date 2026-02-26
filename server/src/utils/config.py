@@ -9,7 +9,12 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     ENVIRONMENT: str = "development"
 
-    # AWS
+    # Firebase
+    FIREBASE_PROJECT_ID: str = ""
+    FIREBASE_CREDENTIALS_PATH: str = "firebase-credentials.json"
+    GOOGLE_APPLICATION_CREDENTIALS: str = ""  # Path to service account JSON
+
+    # AWS (Legacy - can be removed if not using AWS)
     AWS_REGION: str = "us-east-1"
     COGNITO_USER_POOL_ID: str = ""
     COGNITO_CLIENT_ID: str = ""

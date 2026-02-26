@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import { useAuthStore } from './stores/authStore'
 import Layout from './components/Layout'
 import Home from './pages/Home'
@@ -15,6 +16,13 @@ function PrivateRoute({ children }) {
 }
 
 function App() {
+  const { initAuthListener } = useAuthStore()
+
+  useEffect(() => {
+    // Initialize Firebase auth state listener
+    initAuthListener()
+  }, [initAuthListener])
+
   return (
     <Router>
       <Routes>
