@@ -1,15 +1,15 @@
-import { Outlet, Link, useNavigate } from 'react-router-dom'
-import { useAuthStore } from '../stores/authStore'
-import { Mic, LogOut, BarChart3, Home } from 'lucide-react'
+import { Outlet, Link, useNavigate } from "react-router-dom";
+import { useAuthStore } from "../stores/authStore";
+import { Mic, LogOut, BarChart3, Home } from "lucide-react";
 
 export default function Layout() {
-  const { isAuthenticated, user, logout } = useAuthStore()
-  const navigate = useNavigate()
+  const { isAuthenticated, user, logout } = useAuthStore();
+  const navigate = useNavigate();
 
   const handleLogout = () => {
-    logout()
-    navigate('/login')
-  }
+    logout();
+    navigate("/login");
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -19,17 +19,25 @@ export default function Layout() {
           <div className="flex justify-between items-center h-16">
             <Link to="/" className="flex items-center space-x-2">
               <Mic className="w-8 h-8 text-primary-600" />
-              <span className="text-xl font-bold text-gray-900">Interview AI</span>
+              <span className="text-xl font-bold text-gray-900">
+                Interview AI
+              </span>
             </Link>
 
             <nav className="flex items-center space-x-6">
               {isAuthenticated ? (
                 <>
-                  <Link to="/dashboard" className="flex items-center space-x-1 text-gray-700 hover:text-primary-600">
+                  <Link
+                    to="/dashboard"
+                    className="flex items-center space-x-1 text-gray-700 hover:text-primary-600"
+                  >
                     <Home className="w-5 h-5" />
                     <span>Dashboard</span>
                   </Link>
-                  <Link to="/analytics" className="flex items-center space-x-1 text-gray-700 hover:text-primary-600">
+                  <Link
+                    to="/analytics"
+                    className="flex items-center space-x-1 text-gray-700 hover:text-primary-600"
+                  >
                     <BarChart3 className="w-5 h-5" />
                     <span>Analytics</span>
                   </Link>
@@ -46,7 +54,10 @@ export default function Layout() {
                 </>
               ) : (
                 <>
-                  <Link to="/login" className="text-gray-700 hover:text-primary-600">
+                  <Link
+                    to="/login"
+                    className="text-gray-700 hover:text-primary-600"
+                  >
                     Login
                   </Link>
                   <Link to="/register" className="btn-primary">
@@ -69,11 +80,11 @@ export default function Layout() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <p className="text-gray-400">
-              © 2024 Interview AI. Voice-first interview preparation platform.
+              © 2026 Interview AI. Voice-first interview preparation platform.
             </p>
           </div>
         </div>
       </footer>
     </div>
-  )
+  );
 }
