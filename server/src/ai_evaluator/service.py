@@ -5,6 +5,7 @@ LLM-based answer evaluation with rubric scoring
 import json
 import logging
 from typing import Dict
+import asyncio
 from openai import AsyncOpenAI
 import jsonschema
 
@@ -14,13 +15,36 @@ from src.utils.config import settings
 
 logger = logging.getLogger(__name__)
 
+try:
+    import boto3
+except Exception:
+    boto3 = None
+
 
 class AIEvaluatorService:
     """Evaluates interview answers using LLM"""
     
     def __init__(self):
-        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        self.provider = settings.AI_PROVIDER.lower()
         self.model = settings.AI_MODEL
+        self.client = None
+        self.bedrock_client = None
+        self.bedrock_model_id = settings.AWS_BEDROCK_MODEL_ID
+
+        if self.provider == "openai":
+            self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        elif self.provider == "aws_bedrock":
+            if boto3 is None:
+                raise ValueError("boto3 is required for AI_PROVIDER=aws_bedrock")
+            region = settings.AWS_BEDROCK_REGION or settings.AWS_REGION
+            if not region:
+                raise ValueError("Set AWS_BEDROCK_REGION or AWS_REGION for Bedrock")
+            if not self.bedrock_model_id:
+                raise ValueError("Set AWS_BEDROCK_MODEL_ID for Bedrock")
+            self.bedrock_client = boto3.client("bedrock-runtime", region_name=region)
+        else:
+            raise ValueError("Unsupported AI_PROVIDER. Use 'openai' or 'aws_bedrock'.")
+
         self.schema = self._load_schema()
     
     def _load_schema(self) -> dict:
@@ -90,6 +114,9 @@ class AIEvaluatorService:
     
     async def _call_llm(self, prompt: str) -> str:
         """Call LLM API with timeout"""
+        if self.provider == "aws_bedrock":
+            return await self._call_bedrock(prompt)
+
         try:
             response = await self.client.chat.completions.create(
                 model=self.model,
@@ -111,9 +138,79 @@ class AIEvaluatorService:
         except Exception as e:
             logger.error(f"LLM API call failed: {e}")
             raise
+
+    async def _call_bedrock(self, prompt: str) -> str:
+        """Call AWS Bedrock model."""
+        return await asyncio.to_thread(self._invoke_bedrock, prompt)
+
+    def _invoke_bedrock(self, prompt: str) -> str:
+        model_id = self.bedrock_model_id
+
+        if model_id.startswith("anthropic."):
+            payload = {
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": settings.AWS_BEDROCK_MAX_TOKENS,
+                "temperature": settings.AI_TEMPERATURE,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": (
+                            "You are an expert interview evaluator. "
+                            "Always return valid JSON only, no markdown.\n\n"
+                            f"{prompt}"
+                        ),
+                    }
+                ],
+            }
+            response = self.bedrock_client.invoke_model(
+                modelId=model_id,
+                contentType="application/json",
+                accept="application/json",
+                body=json.dumps(payload),
+            )
+            data = json.loads(response["body"].read())
+            content = data.get("content", [])
+            return "".join(
+                part.get("text", "") for part in content if isinstance(part, dict)
+            )
+
+        if model_id.startswith("amazon.titan"):
+            payload = {
+                "inputText": (
+                    "You are an expert interview evaluator. "
+                    "Always return valid JSON only, no markdown.\n\n"
+                    f"{prompt}"
+                ),
+                "textGenerationConfig": {
+                    "maxTokenCount": settings.AWS_BEDROCK_MAX_TOKENS,
+                    "temperature": settings.AI_TEMPERATURE,
+                    "topP": 0.9,
+                },
+            }
+            response = self.bedrock_client.invoke_model(
+                modelId=model_id,
+                contentType="application/json",
+                accept="application/json",
+                body=json.dumps(payload),
+            )
+            data = json.loads(response["body"].read())
+            results = data.get("results", [])
+            if results:
+                return results[0].get("outputText", "")
+            return ""
+
+        raise ValueError(
+            "Unsupported Bedrock model family. Use Anthropic Claude or Amazon Titan model ids."
+        )
     
     def _parse_and_validate(self, response: str) -> Dict:
         """Parse and validate LLM response against schema"""
+        response = response.strip()
+        if response.startswith("```"):
+            response = response.strip("`")
+            if response.lower().startswith("json"):
+                response = response[4:].strip()
+
         try:
             data = json.loads(response)
         except json.JSONDecodeError as e:

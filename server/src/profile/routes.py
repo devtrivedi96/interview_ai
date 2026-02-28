@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from src.auth.security import get_current_user_firebase
 from src.db.firebase_client import get_db, Collections
 from src.db.models import User
+from src.ai_evaluator.content_generator import AIContentGenerator
 
 router = APIRouter()
 
@@ -42,6 +43,10 @@ class PreferencesSaveRequest(BaseModel):
     experience_level: str
     target_company_type: str
     preferred_interview_modes: List[str]
+
+
+class PreparationPlanRequest(BaseModel):
+    topics: List[str]
 
 
 @router.get("/preferences", response_model=PreferencesResponse)
@@ -96,12 +101,19 @@ async def save_preferences(
     }
     
     try:
-        # Update user's profile with preferences
-        user_ref.update({
-            "profile": {
-                "preferences": preferences_data
-            }
-        })
+        # Upsert user profile with preferences
+        user_ref.set(
+            {
+                "email": current_user.email,
+                "email_verified": True,
+                "audio_consent": current_user.audio_consent,
+                "profile": {
+                    "preferences": preferences_data
+                },
+                "updated_at": datetime.utcnow(),
+            },
+            merge=True,
+        )
         
         return PreferencesResponse(
             exists=True,
@@ -112,3 +124,25 @@ async def save_preferences(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to save preferences: {str(e)}",
         )
+
+
+@router.post("/preparation/plan")
+async def generate_preparation_plan(
+    req: PreparationPlanRequest,
+    current_user: User = Depends(get_current_user_firebase),
+):
+    """Generate learning plan from user topics using AI."""
+    topics = [t.strip() for t in req.topics if t and t.strip()]
+    if not topics:
+        raise HTTPException(status_code=400, detail="At least one topic is required")
+
+    db = get_db()
+    user_doc = db.collection(Collections.USERS).document(current_user.id).get()
+    preferences = None
+    if user_doc.exists:
+        user_data = user_doc.to_dict() or {}
+        preferences = (user_data.get("profile") or {}).get("preferences")
+
+    generator = AIContentGenerator()
+    plan = generator.generate_preparation_plan(topics=topics, preferences=preferences)
+    return {"topics": topics, "plan": plan}

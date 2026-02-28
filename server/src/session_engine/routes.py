@@ -13,6 +13,7 @@ from src.session_engine.engine import InterviewEngine
 from src.session_engine.state_machine import SessionStateMachine
 from src.stt_adapter.service import STTService
 from src.ai_evaluator.service import AIEvaluatorService
+from src.ai_evaluator.content_generator import AIContentGenerator
 from src.utils.config import settings
 
 router = APIRouter()
@@ -26,6 +27,23 @@ class SessionCreate(BaseModel):
 class AnswerSubmit(BaseModel):
     transcript: Optional[str] = None
     audio_duration_sec: Optional[float] = None
+
+
+@router.get("/modes/cards")
+async def get_interview_mode_cards(
+    current_user: User = Depends(get_current_user_firebase)
+):
+    """Return dynamic interview cards based on user preferences."""
+    db = get_db()
+    user_doc = db.collection(Collections.USERS).document(current_user.id).get()
+    preferences = None
+    if user_doc.exists:
+        user_data = user_doc.to_dict() or {}
+        preferences = (user_data.get("profile") or {}).get("preferences")
+
+    generator = AIContentGenerator()
+    cards = generator.generate_mode_cards(preferences=preferences)
+    return {"cards": cards}
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -184,11 +202,16 @@ async def submit_answer(
     
     # Get transcript
     transcript = answer_data.transcript
+    clarity_score = None
     
     if not transcript and audio_file:
         # Transcribe audio
         stt_service = STTService()
         transcript = await stt_service.transcribe(audio_file)
+        if answer_data.audio_duration_sec:
+            clarity_score = stt_service.calculate_clarity_score(
+                transcript, answer_data.audio_duration_sec
+            )
     
     if not transcript:
         raise HTTPException(
@@ -199,7 +222,8 @@ async def submit_answer(
     # Update question with transcript
     db.collection(Collections.SESSION_QUESTIONS).document(question_id).update({
         'transcript': transcript,
-        'audio_duration_sec': answer_data.audio_duration_sec
+        'audio_duration_sec': answer_data.audio_duration_sec,
+        'clarity_score': clarity_score,
     })
     
     # Evaluate answer
@@ -212,9 +236,15 @@ async def submit_answer(
     eval_ref.set(evaluation.to_dict())
     
     return {
+        "transcript": transcript,
+        "clarity_score": clarity_score,
+        "clarity_ok": (
+            clarity_score is None or clarity_score >= settings.AUDIO_QUALITY_THRESHOLD
+        ),
         "composite_score": evaluation.composite_score,
         "strengths": evaluation.strengths,
         "improvements": evaluation.improvements,
+        "next_question_strategy": evaluation.next_question_strategy,
         "dimension_scores": {
             "dimension_1": evaluation.score_dimension_1,
             "dimension_2": evaluation.score_dimension_2,

@@ -11,6 +11,7 @@ from src.db.models import (
     AnswerEvaluation, InterviewMode
 )
 from src.db.firebase_client import get_db, Collections
+from src.ai_evaluator.content_generator import AIContentGenerator
 from src.utils.config import settings
 
 logger = logging.getLogger(__name__)
@@ -21,6 +22,7 @@ class InterviewEngine:
     
     def __init__(self):
         self.db = get_db()
+        self.content_generator = AIContentGenerator()
     
     def generate_next_question(self, session: InterviewSession) -> SessionQuestion:
         """
@@ -34,16 +36,22 @@ class InterviewEngine:
         # Calculate adaptive difficulty
         current_difficulty = self._calculate_adaptive_difficulty(session, recent_questions)
         
-        # Get question from bank or generate fallback
-        question = self._get_question_from_bank(session.mode, current_difficulty)
+        preferences = self._get_user_preferences(session.user_id)
+        previous_improvements = self._get_recent_improvements(session.id, limit=3)
+        question_text = self.content_generator.generate_question(
+            session.mode,
+            current_difficulty,
+            preferences=preferences,
+            previous_improvements=previous_improvements,
+        )
         
         # Create session question
         sq_ref = self.db.collection(Collections.SESSION_QUESTIONS).document()
         session_question = SessionQuestion(
             id=sq_ref.id,
             session_id=session.id,
-            question_id=question.id if question else None,
-            question_text=question.question_text if question else self._generate_fallback_question(session.mode, current_difficulty),
+            question_id=None,
+            question_text=question_text,
             difficulty=current_difficulty
         )
         
@@ -57,6 +65,41 @@ class InterviewEngine:
         
         logger.info(f"Generated question for session {session.id}, difficulty {current_difficulty}")
         return session_question
+
+    def _get_user_preferences(self, user_id: str) -> Optional[dict]:
+        user_doc = self.db.collection(Collections.USERS).document(user_id).get()
+        if not user_doc.exists:
+            return None
+        user_data = user_doc.to_dict() or {}
+        profile = user_data.get("profile") or {}
+        if not isinstance(profile, dict):
+            return None
+        preferences = profile.get("preferences")
+        return preferences if isinstance(preferences, dict) else None
+
+    def _get_recent_improvements(self, session_id: str, limit: int = 3) -> List[str]:
+        improvements: List[str] = []
+        questions = (
+            self.db.collection(Collections.SESSION_QUESTIONS)
+            .where("session_id", "==", session_id)
+            .limit(limit)
+            .get()
+        )
+        for q_doc in questions:
+            evals = (
+                self.db.collection(Collections.EVALUATIONS)
+                .where("session_question_id", "==", q_doc.id)
+                .limit(1)
+                .get()
+            )
+            for e_doc in evals:
+                eval_data = e_doc.to_dict() or {}
+                eval_improvements = eval_data.get("improvements") or []
+                if isinstance(eval_improvements, list):
+                    improvements.extend(
+                        [item for item in eval_improvements if isinstance(item, str)]
+                    )
+        return improvements[:limit]
     
     def _get_recent_questions(
         self, 

@@ -12,14 +12,17 @@ const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
   async (config) => {
-    const token = useAuthStore.getState().token
+    const authState = useAuthStore.getState()
+    const token = authState.token
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
-    const currentUser = auth.currentUser
-    if (currentUser?.uid) {
-      config.headers['X-User-Id'] = currentUser.uid
-      config.headers['X-User-Email'] = currentUser.email || ''
+    // Prefer app user state to avoid transient auth.currentUser null on refresh.
+    const headerUserId = authState.user?.id || auth.currentUser?.uid
+    const headerEmail = authState.user?.email || auth.currentUser?.email || ''
+    if (headerUserId) {
+      config.headers['X-User-Id'] = headerUserId
+      config.headers['X-User-Email'] = headerEmail
     }
     return config
   },
