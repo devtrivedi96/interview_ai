@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { sessionService } from '../services/sessionService'
-import { Mic, Square, Loader } from 'lucide-react'
+import { Mic, Square, Loader, Volume2 } from 'lucide-react'
 
 export default function Interview() {
   const { sessionId } = useParams()
@@ -13,16 +13,78 @@ export default function Interview() {
   const [evaluation, setEvaluation] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [isSpeakingQuestion, setIsSpeakingQuestion] = useState(false)
+  const [autoFlow, setAutoFlow] = useState(true)
+  const [handsFree, setHandsFree] = useState(true)
+  const [autoNextCountdown, setAutoNextCountdown] = useState(0)
+  const [questionIndex, setQuestionIndex] = useState(1)
   
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
   const startTimeRef = useRef(null)
+  const utteranceRef = useRef(null)
+  const autoNextTimerRef = useRef(null)
 
   useEffect(() => {
     loadNextQuestion()
   }, [])
 
+  useEffect(() => {
+    if (question?.question_text) {
+      speakQuestion(question.question_text)
+    }
+    return () => {
+      window.speechSynthesis.cancel()
+      utteranceRef.current = null
+    }
+  }, [question?.id])
+
+  useEffect(() => {
+    if (!evaluation || !autoFlow) return
+
+    setAutoNextCountdown(4)
+    autoNextTimerRef.current = setInterval(() => {
+      setAutoNextCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(autoNextTimerRef.current)
+          loadNextQuestion()
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => {
+      if (autoNextTimerRef.current) clearInterval(autoNextTimerRef.current)
+    }
+  }, [evaluation, autoFlow])
+
+  const speakQuestion = (text) => {
+    if (!('speechSynthesis' in window) || !text) return
+    window.speechSynthesis.cancel()
+
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.rate = 0.95
+    utterance.pitch = 1
+    utterance.volume = 1
+    utterance.onstart = () => setIsSpeakingQuestion(true)
+    utterance.onend = () => {
+      setIsSpeakingQuestion(false)
+      if (handsFree && !evaluation && !isRecording) {
+        startRecording()
+      }
+    }
+    utterance.onerror = () => setIsSpeakingQuestion(false)
+    utteranceRef.current = utterance
+    window.speechSynthesis.speak(utterance)
+  }
+
   const loadNextQuestion = async () => {
+    if (autoNextTimerRef.current) {
+      clearInterval(autoNextTimerRef.current)
+      autoNextTimerRef.current = null
+    }
+    setAutoNextCountdown(0)
     setLoading(true)
     setError('')
     setEvaluation(null)
@@ -31,6 +93,7 @@ export default function Interview() {
     try {
       const data = await sessionService.getNextQuestion(sessionId)
       setQuestion(data)
+      setQuestionIndex((prev) => prev + (question ? 1 : 0))
     } catch (err) {
       if (err.response?.status === 400) {
         // Max questions reached
@@ -44,9 +107,15 @@ export default function Interview() {
   }
 
   const startRecording = async () => {
+    if (!question?.id) {
+      setError('Question is not ready yet. Please wait a moment and try again.')
+      return
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mediaRecorder = new MediaRecorder(stream)
+      const questionIdAtRecordStart = question.id
       
       mediaRecorderRef.current = mediaRecorder
       audioChunksRef.current = []
@@ -66,7 +135,7 @@ export default function Interview() {
         stream.getTracks().forEach(track => track.stop())
         
         // Submit answer
-        await submitAnswer(audioBlob, duration)
+        await submitAnswer(audioBlob, duration, questionIdAtRecordStart)
       }
 
       mediaRecorder.start()
@@ -84,14 +153,18 @@ export default function Interview() {
     }
   }
 
-  const submitAnswer = async (audioBlob, duration) => {
+  const submitAnswer = async (audioBlob, duration, questionId) => {
     setLoading(true)
     setError('')
     
     try {
+      if (!questionId) {
+        throw new Error('Question ID missing for answer submission')
+      }
+
       const audioFile = new File([audioBlob], 'answer.webm', { type: 'audio/webm' })
       
-      const result = await sessionService.submitAnswer(sessionId, question.id, {
+      const result = await sessionService.submitAnswer(sessionId, questionId, {
         audioFile,
         audioDuration: duration
       })
@@ -138,10 +211,20 @@ export default function Interview() {
         {question && (
           <div className="mb-8">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Question</h2>
-              <span className="text-sm text-gray-600">
-                Difficulty: {question.difficulty}/5
-              </span>
+              <h2 className="text-xl font-semibold">Question {questionIndex}</h2>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-600">
+                  Difficulty: {question.difficulty}/5
+                </span>
+                <button
+                  onClick={() => speakQuestion(question.question_text)}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-300 text-sm hover:bg-gray-50"
+                  type="button"
+                >
+                  <Volume2 className="w-4 h-4" />
+                  {isSpeakingQuestion ? 'Speaking...' : 'Replay'}
+                </button>
+              </div>
             </div>
             <div className="bg-primary-50 rounded-lg p-6">
               <p className="text-lg text-gray-800">{question.question_text}</p>
@@ -152,11 +235,30 @@ export default function Interview() {
         {/* Recording Controls */}
         {!evaluation && (
           <div className="mb-8">
+            <div className="mb-4 flex flex-wrap gap-4">
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={handsFree}
+                  onChange={(e) => setHandsFree(e.target.checked)}
+                />
+                Hands-free recording
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={autoFlow}
+                  onChange={(e) => setAutoFlow(e.target.checked)}
+                />
+                Auto next question
+              </label>
+            </div>
+
             <div className="flex flex-col items-center space-y-4">
               {!isRecording ? (
                 <button
                   onClick={startRecording}
-                  disabled={loading}
+                  disabled={loading || !question || isSpeakingQuestion}
                   className="flex items-center space-x-2 bg-red-500 text-white px-8 py-4 rounded-full font-semibold hover:bg-red-600 transition disabled:opacity-50"
                 >
                   <Mic className="w-6 h-6" />
@@ -198,6 +300,30 @@ export default function Interview() {
         {/* Evaluation Results */}
         {evaluation && (
           <div className="space-y-6">
+            {transcript && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">
+                  Transcript (What AI Heard)
+                </p>
+                <p className="text-gray-800">{transcript}</p>
+                {typeof evaluation.clarity_score === 'number' && (
+                  <p className="text-sm mt-2 text-gray-600">
+                    Clarity score: {evaluation.clarity_score.toFixed(2)}{' '}
+                    {!evaluation.clarity_ok && (
+                      <span className="text-amber-700">
+                        (Try speaking slower and clearer for better scoring)
+                      </span>
+                    )}
+                  </p>
+                )}
+                {evaluation.next_question_strategy && (
+                  <p className="text-sm mt-1 text-gray-600">
+                    Next strategy: <span className="font-medium">{evaluation.next_question_strategy}</span>
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="text-center">
               <p className="text-gray-600 mb-2">Your Score</p>
               <p className="text-5xl font-bold text-primary-600">
@@ -251,7 +377,9 @@ export default function Interview() {
                 onClick={loadNextQuestion}
                 className="btn-primary"
               >
-                Next Question
+                {autoFlow && autoNextCountdown > 0
+                  ? `Next Question (${autoNextCountdown})`
+                  : 'Next Question'}
               </button>
               <button
                 onClick={handleComplete}

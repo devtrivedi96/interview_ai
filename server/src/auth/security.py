@@ -7,6 +7,7 @@ from datetime import datetime
 from fastapi import Depends, Header, HTTPException, status
 
 from src.db.models import User
+from src.utils.config import settings
 
 _AUDIO_CONSENT_BY_USER: dict[str, bool] = {}
 
@@ -42,6 +43,9 @@ def require_audio_consent(
     current_user: User = Depends(get_current_user_firebase),
 ) -> User:
     """Dependency to ensure user has given audio consent."""
+    if not settings.REQUIRE_AUDIO_CONSENT:
+        return current_user
+
     if not current_user.audio_consent:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

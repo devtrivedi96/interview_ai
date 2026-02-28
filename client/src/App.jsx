@@ -10,10 +10,18 @@ import Interview from './pages/Interview'
 import SessionSummary from './pages/SessionSummary'
 import Analytics from './pages/Analytics'
 import Profile from './pages/Profile'
+import Suggestions from './pages/Suggestions'
+import Preparation from './pages/Preparation'
+import InterviewCenter from './pages/InterviewCenter'
 
 function PrivateRoute({ children }) {
   const { isAuthenticated } = useAuthStore()
   return isAuthenticated ? children : <Navigate to="/login" />
+}
+
+function RootRoute() {
+  const { isAuthenticated } = useAuthStore()
+  return isAuthenticated ? <Navigate to="/dashboard" /> : <Home />
 }
 
 function App() {
@@ -28,12 +36,16 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={<Home />} />
+          <Route index element={<RootRoute />} />
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />
           
           <Route path="dashboard" element={
             <PrivateRoute><Dashboard /></PrivateRoute>
+          } />
+
+          <Route path="interview" element={
+            <PrivateRoute><InterviewCenter /></PrivateRoute>
           } />
           
           <Route path="interview/:sessionId" element={
@@ -50,6 +62,14 @@ function App() {
 
           <Route path="profile" element={
             <PrivateRoute><Profile /></PrivateRoute>
+          } />
+
+          <Route path="suggestions" element={
+            <PrivateRoute><Suggestions /></PrivateRoute>
+          } />
+
+          <Route path="preparation" element={
+            <PrivateRoute><Preparation /></PrivateRoute>
           } />
 
           {/* Preferences redirect - show modal on dashboard */}

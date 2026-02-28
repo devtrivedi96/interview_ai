@@ -5,14 +5,21 @@ import PreferencesModal from '../components/PreferencesModal'
 import { User, Edit2 } from 'lucide-react'
 
 export default function Profile() {
-  const { user } = useAuthStore()
+  const { user, updateAudioConsent } = useAuthStore()
   const { preferences, preferencesExists, fetchPreferences } = useProfileStore()
   const [showModal, setShowModal] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [consentValue, setConsentValue] = useState(false)
+  const [savingConsent, setSavingConsent] = useState(false)
+  const [consentMessage, setConsentMessage] = useState('')
 
   useEffect(() => {
     loadPreferences()
   }, [])
+
+  useEffect(() => {
+    setConsentValue(Boolean(user?.audio_consent))
+  }, [user?.audio_consent])
 
   const loadPreferences = async () => {
     try {
@@ -21,6 +28,20 @@ export default function Profile() {
       console.error('Failed to load preferences:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleConsentSave = async () => {
+    setSavingConsent(true)
+    setConsentMessage('')
+    try {
+      await updateAudioConsent(consentValue)
+      setConsentMessage('Audio consent updated.')
+    } catch (error) {
+      console.error('Failed to update consent:', error)
+      setConsentMessage('Failed to update consent. Try again.')
+    } finally {
+      setSavingConsent(false)
     }
   }
 
@@ -68,6 +89,40 @@ export default function Profile() {
                 {user?.audio_consent ? 'Yes ✓' : 'No'}
               </p>
             </div>
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <p className="text-sm font-medium text-gray-900 mb-3">Allow audio recording for interview answers?</p>
+            <div className="flex flex-wrap gap-4">
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="radio"
+                  name="audio-consent"
+                  checked={consentValue === true}
+                  onChange={() => setConsentValue(true)}
+                />
+                Yes
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="radio"
+                  name="audio-consent"
+                  checked={consentValue === false}
+                  onChange={() => setConsentValue(false)}
+                />
+                No
+              </label>
+              <button
+                onClick={handleConsentSave}
+                disabled={savingConsent}
+                className="btn-primary disabled:opacity-50"
+              >
+                {savingConsent ? 'Saving...' : 'Save Consent'}
+              </button>
+            </div>
+            {consentMessage && (
+              <p className="mt-2 text-sm text-gray-600">{consentMessage}</p>
+            )}
           </div>
         </div>
 

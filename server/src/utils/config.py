@@ -43,11 +43,17 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
 
     # OpenAI
+    AI_PROVIDER: str = "openai"  # openai | aws_bedrock
     OPENAI_API_KEY: str = ""
     AI_MODEL: str = "gpt-4"
     AI_TEMPERATURE: float = 0.3
     AI_MAX_RETRIES: int = 2
     AI_TIMEOUT_SEC: int = 30
+
+    # AWS Bedrock
+    AWS_BEDROCK_REGION: str = ""
+    AWS_BEDROCK_MODEL_ID: str = ""
+    AWS_BEDROCK_MAX_TOKENS: int = 1000
 
     # STT
     STT_PROVIDER: str = "openai"

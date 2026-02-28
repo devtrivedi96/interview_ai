@@ -1,6 +1,12 @@
 import api from './api'
 
 export const sessionService = {
+  // Get dynamic interview cards
+  getInterviewCards: async () => {
+    const response = await api.get('/sessions/modes/cards')
+    return response.data
+  },
+
   // Create new session
   createSession: async (mode, difficultyStart = 3) => {
     const response = await api.post('/sessions', {

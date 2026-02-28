@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
+import json
 
 from src.utils.config import settings
 from src.auth.routes import router as auth_router
@@ -14,7 +15,23 @@ def create_app():
     app = FastAPI(title=settings.APP_NAME)
 
     # CORS
-    origins = settings.CORS_ORIGINS if isinstance(settings.CORS_ORIGINS, list) else [settings.CORS_ORIGINS]
+    origins = settings.CORS_ORIGINS
+    if isinstance(origins, str):
+        parsed = None
+        try:
+            parsed = json.loads(origins)
+        except Exception:
+            parsed = None
+
+        if isinstance(parsed, list):
+            origins = [str(o).strip() for o in parsed if str(o).strip()]
+        else:
+            origins = [o.strip() for o in origins.split(",") if o.strip()]
+    elif isinstance(origins, list):
+        origins = [str(o).strip() for o in origins if str(o).strip()]
+    else:
+        origins = []
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
