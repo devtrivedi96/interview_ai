@@ -23,12 +23,7 @@ export default function Register() {
     try {
       const result = await register(email, password, audioConsent)
       setSuccessMessage(result.message || '')
-      
-      if (result.needsVerification) {
-        setShowSuccess(true)
-      } else {
-        navigate('/login')
-      }
+      setShowSuccess(true)
     } catch (err) {
       setError(err.message || 'Registration failed. Please try again.')
     } finally {
@@ -48,7 +43,7 @@ export default function Register() {
             </div>
             
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              {successMessage.toLowerCase().includes('verify your email') ? 'Check Your Email!' : 'Account Created'}
+              Account Created
             </h2>
             
             <div className="bg-blue-50 rounded-lg p-4 mb-6">
@@ -62,18 +57,8 @@ export default function Register() {
                 <strong>Next steps:</strong>
               </p>
               <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
-                {successMessage.toLowerCase().includes('verify your email') ? (
-                  <>
-                    <li>Check your email inbox (and spam folder)</li>
-                    <li>Click the verification link in the email</li>
-                    <li>Return here to log in</li>
-                  </>
-                ) : (
-                  <>
-                    <li>Go to login</li>
-                    <li>Use your email and password to sign in</li>
-                  </>
-                )}
+                <li>Go to login</li>
+                <li>Use your email and password to sign in</li>
               </ol>
             </div>
             
@@ -97,9 +82,7 @@ export default function Register() {
               </button>
             </div>
             
-            <p className="text-xs text-gray-500 mt-6">
-              Didn't receive the email? Check your spam folder or try registering again.
-            </p>
+            <p className="text-xs text-gray-500 mt-6">You can start using your account immediately.</p>
           </div>
         </div>
       </div>
@@ -193,8 +176,7 @@ export default function Register() {
           
           <div className="mt-4 pt-4 border-t border-gray-200">
             <p className="text-xs text-gray-500 text-center">
-              By creating an account, you agree to receive email notifications including 
-              account verification and interview session updates.
+              By creating an account, you agree to receive interview session updates.
             </p>
           </div>
         </div>

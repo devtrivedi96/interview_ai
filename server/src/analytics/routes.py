@@ -26,12 +26,11 @@ async def get_user_progress(
         - Average scores by mode
         - Improvement trends
     """
+    from google.cloud import firestore
     db = get_db()
-    
-    # Get recent sessions
     sessions = db.collection(Collections.SESSIONS)\
         .where('user_id', '==', current_user.id)\
-        .order_by('created_at', direction='DESCENDING')\
+        .order_by('created_at', direction=firestore.Query.DESCENDING)\
         .limit(limit)\
         .get()
     
@@ -90,15 +89,13 @@ async def get_insights(
         - Strengths and weaknesses
         - Recommended focus areas
     """
+    from google.cloud import firestore
     db = get_db()
-    
-    # Get sessions from last N days
     cutoff_date = datetime.utcnow() - timedelta(days=days)
-    
     sessions = db.collection(Collections.SESSIONS)\
         .where('user_id', '==', current_user.id)\
         .where('created_at', '>=', cutoff_date)\
-        .order_by('created_at', direction='ASCENDING')\
+        .order_by('created_at', direction=firestore.Query.ASCENDING)\
         .get()
     
     scores_over_time = []
@@ -177,9 +174,11 @@ async def get_leaderboard(
     if mode:
         query = query.where('mode', '==', mode)
     
-    sessions = query.order_by('total_score', direction='DESCENDING')\
-        .limit(limit)\
+    sessions = (
+        query.order_by('total_score', direction='DESCENDING')
+        .limit(limit)
         .get()
+    )
     
     leaderboard = []
     for i, session_doc in enumerate(sessions, 1):

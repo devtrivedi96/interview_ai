@@ -5,7 +5,6 @@ Handles interview session lifecycle
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime
 
 from src.db.firebase_client import get_db, Collections
 from src.db.models import User, InterviewSession, SessionState, InterviewMode
@@ -180,7 +179,7 @@ async def submit_answer(
     if not question_doc.exists:
         raise HTTPException(status_code=404, detail="Question not found")
     
-    from db.models import SessionQuestion
+    from src.db.models import SessionQuestion
     question = SessionQuestion.from_dict(question_doc.id, question_doc.to_dict())
     
     # Get transcript
@@ -292,12 +291,15 @@ async def list_sessions(
     limit: int = 10
 ):
     """List user's interview sessions"""
+    from google.cloud import firestore
     db = get_db()
-    sessions = db.collection(Collections.SESSIONS)\
-        .where('user_id', '==', current_user.id)\
-        .order_by('created_at', direction='DESCENDING')\
-        .limit(limit)\
+    sessions = (
+        db.collection(Collections.SESSIONS)
+        .where('user_id', '==', current_user.id)
+        .order_by('created_at', direction=firestore.Query.DESCENDING)
+        .limit(limit)
         .get()
+    )
     
     result = []
     for session_doc in sessions:

@@ -1,6 +1,12 @@
+from pathlib import Path
 from typing import List
-from pydantic_settings import BaseSettings
+
 from pydantic import ConfigDict
+from pydantic_settings import BaseSettings
+
+
+BASE_DIR = Path(__file__).resolve().parents[2]
+ENV_FILE = BASE_DIR / ".env"
 
 
 class Settings(BaseSettings):
@@ -12,10 +18,18 @@ class Settings(BaseSettings):
     # Firebase
     FIREBASE_PROJECT_ID: str = ""
     FIREBASE_CREDENTIALS_PATH: str = "firebase-credentials.json"
-    GOOGLE_APPLICATION_CREDENTIALS: str = ""  # Path to service account JSON
+    FIREBASE_API_KEY: str = ""
+    FIREBASE_AUTH_DOMAIN: str = ""
+    FIREBASE_STORAGE_BUCKET: str = ""
+    FIREBASE_MESSAGING_SENDER_ID: str = ""
+    FIREBASE_APP_ID: str = ""
+    FIREBASE_MEASUREMENT_ID: str = ""
 
-    # AWS (Legacy - can be removed if not using AWS)
+    # AWS (optional in current Firebase path)
     AWS_REGION: str = "us-east-1"
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+    AWS_SESSION_TOKEN: str = ""
     COGNITO_USER_POOL_ID: str = ""
     COGNITO_CLIENT_ID: str = ""
 
@@ -68,13 +82,13 @@ class Settings(BaseSettings):
     ENABLE_ANALYTICS: bool = True
     LOG_LEVEL: str = "INFO"
 
-    # Email (Brevo)
+    # Email
     BREVO_API_KEY: str = ""
     BREVO_SENDER_EMAIL: str = ""
     BREVO_SENDER_NAME: str = "Interview AI"
     EMAIL_VERIFICATION_REDIRECT_URL: str = "http://localhost:5173/login"
 
-    model_config = ConfigDict(env_file=".env")
+    model_config = ConfigDict(env_file=str(ENV_FILE), env_file_encoding="utf-8")
 
 
 settings = Settings()

@@ -1,6 +1,14 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import {
+  createUserWithEmailAndPassword,
+  getIdToken,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+} from "firebase/auth";
 import api from "../services/api";
+import { auth } from "../config/firebase";
 
 export const useAuthStore = create(
   persist(
@@ -11,62 +19,47 @@ export const useAuthStore = create(
       loading: false,
       error: null,
 
-      // Initialize auth state from Firebase and backend
       initAuthListener: async () => {
-        try {
-          // Try to fetch current user from backend if we have a token
-          const { token } = get();
-          if (token) {
-            try {
-              const response = await api.get("/auth/me");
-              set({
-                user: response.data,
-                isAuthenticated: true,
-                loading: false,
-              });
-            } catch (error) {
-              console.error("Failed to fetch user profile:", error);
-              set({
-                user: null,
-                token: null,
-                isAuthenticated: false,
-                loading: false,
-              });
-            }
+        onAuthStateChanged(auth, async (firebaseUser) => {
+          if (!firebaseUser) {
+            set({ user: null, token: null, isAuthenticated: false, loading: false });
+            return;
           }
-        } catch (error) {
-          console.error("Auth initialization error:", error);
-          set({
-            user: null,
-            token: null,
-            isAuthenticated: false,
-            loading: false,
-          });
-        }
+
+          try {
+            const token = await getIdToken(firebaseUser, true);
+            const response = await api.get("/auth/me", {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+
+            set({
+              token,
+              user: response.data,
+              isAuthenticated: true,
+              loading: false,
+              error: null,
+            });
+          } catch (error) {
+            console.error("Failed to fetch user profile:", error);
+            set({ user: null, token: null, isAuthenticated: false, loading: false });
+          }
+        });
       },
 
       register: async (email, password, audioConsent = false) => {
         set({ loading: true, error: null });
         try {
-          // Register user via backend API (which handles Firebase or mock auth)
-          const response = await api.post("/auth/register", {
-            email,
-            password,
-            audio_consent: audioConsent,
-          });
+          await createUserWithEmailAndPassword(auth, email, password);
+          await signOut(auth);
 
           set({ loading: false });
-
           return {
             success: true,
-            message: response.data.message || "Registration successful!",
-            needsVerification: (response.data.message || "").toLowerCase().includes("verify your email"),
+            message: "Account created successfully. You can log in now.",
+            needsVerification: false,
           };
         } catch (error) {
-          const errorMessage =
-            error.response?.data?.detail ||
-            error.message ||
-            "Registration failed";
+          const errorMessage = error.message || "Registration failed";
           set({ loading: false, error: errorMessage });
           throw new Error(errorMessage);
         }
@@ -75,23 +68,15 @@ export const useAuthStore = create(
       login: async (email, password) => {
         set({ loading: true, error: null });
         try {
-          // Authenticate via backend API (which handles Firebase or mock auth)
-          const response = await api.post("/auth/login", {
-            email,
-            password,
-          });
+          const userCredential = await signInWithEmailAndPassword(auth, email, password);
 
-          const token = response.data.access_token || response.data.token;
-          
-          // Fetch user profile from backend
+          const token = await getIdToken(userCredential.user, true);
           const userResponse = await api.get("/auth/me", {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
+            headers: { Authorization: `Bearer ${token}` },
           });
 
           set({
-            token: token,
+            token,
             user: userResponse.data,
             isAuthenticated: true,
             loading: false,
@@ -99,7 +84,7 @@ export const useAuthStore = create(
 
           return {
             success: true,
-            token: token,
+            token,
             user: userResponse.data,
           };
         } catch (error) {
@@ -112,6 +97,7 @@ export const useAuthStore = create(
 
       logout: async () => {
         try {
+          await signOut(auth);
           set({ user: null, token: null, isAuthenticated: false });
           delete api.defaults.headers.common["Authorization"];
         } catch (error) {
@@ -119,29 +105,15 @@ export const useAuthStore = create(
         }
       },
 
-      resendVerificationEmail: async (email) => {
-        try {
-          const response = await api.post("/auth/verify-email/resend", {
-            email,
-          });
-          return {
-            success: true,
-            message: response.data.message || "Verification email sent!",
-          };
-        } catch (error) {
-          const errorMessage =
-            error.response?.data?.detail ||
-            "Failed to resend verification email";
-          throw new Error(errorMessage);
-        }
-      },
-
       refreshToken: async () => {
-        const { user } = get();
-        if (user) {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
           try {
-            const response = await api.get("/auth/me");
-            set({ user: response.data });
+            const token = await getIdToken(currentUser, true);
+            const response = await api.get("/auth/me", {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            set({ token, user: response.data, isAuthenticated: true });
             return true;
           } catch (error) {
             set({ token: null, user: null, isAuthenticated: false });

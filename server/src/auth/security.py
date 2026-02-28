@@ -1,90 +1,47 @@
 """
 Security utilities
-Firebase token validation and authenticated user resolution
+Frontend-provided user identity resolution (no backend token verification or Firestore)
 """
 from datetime import datetime
-from typing import Optional
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from src.auth import firebase_auth
+from fastapi import Depends, Header, HTTPException, status
 
-from src.db.firebase_client import get_db, Collections
 from src.db.models import User
 
-security = HTTPBearer()
+_AUDIO_CONSENT_BY_USER: dict[str, bool] = {}
+
+
+def set_audio_consent_for_user(user_id: str, consent: bool) -> None:
+    _AUDIO_CONSENT_BY_USER[user_id] = consent
 
 
 async def get_current_user_firebase(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    x_user_email: str | None = Header(default=None, alias="X-User-Email"),
 ) -> User:
     """
-    Dependency to get current authenticated user.
-    
-    Validates Firebase ID token and retrieves user profile from Firestore.
-    If user document doesn't exist, creates it on first login.
+    Resolve user identity from frontend headers.
+    This bypasses backend token verification (dev-only/insecure mode).
     """
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
+    user_id = x_user_id or "local-dev-user"
+    email = x_user_email or "local-dev@example.com"
+    now = datetime.utcnow()
+
+    return User(
+        id=user_id,
+        email=email,
+        email_verified=True,
+        audio_consent=_AUDIO_CONSENT_BY_USER.get(user_id, False),
+        created_at=now,
+        last_login=now,
+        profile={},
     )
 
-    try:
-        token = credentials.credentials
-        
-        # Verify Firebase ID token
-        decoded_token = firebase_auth.verify_id_token(token)
-        user_id = decoded_token.get("uid")
-        
-        if user_id is None:
-            raise credentials_exception
-            
-    except HTTPException:
-        raise
-    except Exception:
-        raise credentials_exception
-    
-    # Get or create user in Firestore
-    db = get_db()
-    user_ref = db.collection(Collections.USERS).document(user_id)
-    user_doc = user_ref.get()
-    
-    if not user_doc.exists:
-        # Create user document on first login
-        email = decoded_token.get("email", "")
-        email_verified = bool(decoded_token.get("email_verified", False))
-        now = datetime.utcnow()
-        
-        user_ref.set({
-            "email": email,
-            "email_verified": email_verified,
-            "audio_consent": False,
-            "created_at": now,
-            "last_login": now,
-            "profile": {},
-        })
-        user_doc = user_ref.get()
-    
-    user_data = user_doc.to_dict() or {}
-    
-    # Sync email verification status from Firebase token
-    token_email_verified = bool(decoded_token.get("email_verified", False))
-    if user_data.get("email_verified") != token_email_verified:
-        user_ref.update({"email_verified": token_email_verified})
-        user_data["email_verified"] = token_email_verified
-    
-    try:
-        return User.from_dict(user_doc.id, user_data)
-    except Exception:
-        raise credentials_exception
 
-
-def require_audio_consent(current_user: User = Depends(get_current_user_firebase)) -> User:
-    """
-    Dependency to ensure user has given audio consent.
-    Required for recording audio during interviews.
-    """
+def require_audio_consent(
+    current_user: User = Depends(get_current_user_firebase),
+) -> User:
+    """Dependency to ensure user has given audio consent."""
     if not current_user.audio_consent:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

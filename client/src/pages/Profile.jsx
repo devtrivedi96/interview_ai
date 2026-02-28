@@ -57,9 +57,9 @@ export default function Profile() {
 
           <div className="grid md:grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-gray-600">Email Verified</p>
+              <p className="text-gray-600">Account</p>
               <p className="font-medium text-gray-900">
-                {user?.email_verified ? 'Yes ✓' : 'No'}
+                Active
               </p>
             </div>
             <div>

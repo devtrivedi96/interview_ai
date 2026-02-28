@@ -20,7 +20,7 @@ function App() {
   const { initAuthListener } = useAuthStore()
 
   useEffect(() => {
-    // Initialize Firebase auth state listener
+    // Initialize auth state from persisted token
     initAuthListener()
   }, [initAuthListener])
 
