@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard'
 import Interview from './pages/Interview'
 import SessionSummary from './pages/SessionSummary'
 import Analytics from './pages/Analytics'
+import Profile from './pages/Profile'
 
 function PrivateRoute({ children }) {
   const { isAuthenticated } = useAuthStore()
@@ -45,6 +46,15 @@ function App() {
           
           <Route path="analytics" element={
             <PrivateRoute><Analytics /></PrivateRoute>
+          } />
+
+          <Route path="profile" element={
+            <PrivateRoute><Profile /></PrivateRoute>
+          } />
+
+          {/* Preferences redirect - show modal on dashboard */}
+          <Route path="preferences" element={
+            <Navigate to="/dashboard" />
           } />
         </Route>
       </Routes>

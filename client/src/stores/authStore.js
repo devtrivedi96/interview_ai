@@ -11,34 +11,44 @@ export const useAuthStore = create(
       loading: false,
       error: null,
 
-      // Initialize auth state (check if token is still valid)
+      // Initialize auth state from Firebase and backend
       initAuthListener: async () => {
-        const { token } = get();
-        if (token) {
-          try {
-            // Verify token with backend
-            const response = await api.get("/auth/me");
-            set({
-              user: response.data,
-              isAuthenticated: true,
-              loading: false,
-            });
-          } catch (error) {
-            console.error("Auth state error:", error);
-            set({
-              user: null,
-              token: null,
-              isAuthenticated: false,
-              loading: false,
-            });
+        try {
+          // Try to fetch current user from backend if we have a token
+          const { token } = get();
+          if (token) {
+            try {
+              const response = await api.get("/auth/me");
+              set({
+                user: response.data,
+                isAuthenticated: true,
+                loading: false,
+              });
+            } catch (error) {
+              console.error("Failed to fetch user profile:", error);
+              set({
+                user: null,
+                token: null,
+                isAuthenticated: false,
+                loading: false,
+              });
+            }
           }
+        } catch (error) {
+          console.error("Auth initialization error:", error);
+          set({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+            loading: false,
+          });
         }
       },
 
       register: async (email, password, audioConsent = false) => {
         set({ loading: true, error: null });
         try {
-          // Register user via backend (sends verification email via Brevo)
+          // Register user via backend API (which handles Firebase or mock auth)
           const response = await api.post("/auth/register", {
             email,
             password,
@@ -49,10 +59,8 @@ export const useAuthStore = create(
 
           return {
             success: true,
-            message:
-              response.data.message ||
-              "Registration successful! Please check your email to verify your account.",
-            needsVerification: true,
+            message: response.data.message || "Registration successful!",
+            needsVerification: (response.data.message || "").toLowerCase().includes("verify your email"),
           };
         } catch (error) {
           const errorMessage =
@@ -67,35 +75,31 @@ export const useAuthStore = create(
       login: async (email, password) => {
         set({ loading: true, error: null });
         try {
-          // Login with backend (returns JWT token)
+          // Authenticate via backend API (which handles Firebase or mock auth)
           const response = await api.post("/auth/login", {
             email,
             password,
           });
 
-          const { access_token, token_type } = response.data;
-
-          // Fetch user profile
+          const token = response.data.access_token || response.data.token;
+          
+          // Fetch user profile from backend
           const userResponse = await api.get("/auth/me", {
             headers: {
-              Authorization: `${token_type} ${access_token}`,
-            },
+              Authorization: `Bearer ${token}`
+            }
           });
 
           set({
-            token: access_token,
+            token: token,
             user: userResponse.data,
             isAuthenticated: true,
             loading: false,
           });
 
-          // Set token in API client for future requests
-          api.defaults.headers.common["Authorization"] =
-            `${token_type} ${access_token}`;
-
           return {
             success: true,
-            token: access_token,
+            token: token,
             user: userResponse.data,
           };
         } catch (error) {

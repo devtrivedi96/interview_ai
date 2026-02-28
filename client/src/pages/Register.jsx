@@ -10,6 +10,7 @@ export default function Register() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
   
   const { register } = useAuthStore()
   const navigate = useNavigate()
@@ -21,11 +22,12 @@ export default function Register() {
 
     try {
       const result = await register(email, password, audioConsent)
+      setSuccessMessage(result.message || '')
       
       if (result.needsVerification) {
         setShowSuccess(true)
       } else {
-        navigate('/dashboard')
+        navigate('/login')
       }
     } catch (err) {
       setError(err.message || 'Registration failed. Please try again.')
@@ -46,14 +48,12 @@ export default function Register() {
             </div>
             
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              Check Your Email!
+              {successMessage.toLowerCase().includes('verify your email') ? 'Check Your Email!' : 'Account Created'}
             </h2>
             
             <div className="bg-blue-50 rounded-lg p-4 mb-6">
               <Mail className="w-8 h-8 text-blue-600 mx-auto mb-2" />
-              <p className="text-gray-700 mb-2">
-                We've sent a verification email to:
-              </p>
+              <p className="text-gray-700 mb-2">{successMessage || "Registration successful."}</p>
               <p className="font-semibold text-gray-900">{email}</p>
             </div>
             
@@ -62,9 +62,18 @@ export default function Register() {
                 <strong>Next steps:</strong>
               </p>
               <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
-                <li>Check your email inbox (and spam folder)</li>
-                <li>Click the verification link in the email</li>
-                <li>Return here to log in</li>
+                {successMessage.toLowerCase().includes('verify your email') ? (
+                  <>
+                    <li>Check your email inbox (and spam folder)</li>
+                    <li>Click the verification link in the email</li>
+                    <li>Return here to log in</li>
+                  </>
+                ) : (
+                  <>
+                    <li>Go to login</li>
+                    <li>Use your email and password to sign in</li>
+                  </>
+                )}
               </ol>
             </div>
             
