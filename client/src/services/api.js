@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { auth } from '../config/firebase'
 import { useAuthStore } from '../stores/authStore'
 
 const api = axios.create({
@@ -9,17 +8,12 @@ const api = axios.create({
   },
 })
 
-// Request interceptor to add Firebase ID token
+// Request interceptor to add auth token
 api.interceptors.request.use(
   async (config) => {
-    const currentUser = auth.currentUser
-    if (currentUser) {
-      try {
-        const idToken = await currentUser.getIdToken()
-        config.headers.Authorization = `Bearer ${idToken}`
-      } catch (error) {
-        console.error('Error getting ID token:', error)
-      }
+    const token = useAuthStore.getState().token
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
     }
     return config
   },

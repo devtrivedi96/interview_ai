@@ -7,7 +7,7 @@ from typing import Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from firebase_admin import auth as firebase_auth
+from src.auth import firebase_auth
 
 from src.db.firebase_client import get_db, Collections
 from src.db.models import User

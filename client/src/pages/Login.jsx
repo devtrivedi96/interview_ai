@@ -41,7 +41,7 @@ export default function Login() {
     setLoading(true)
     setError('')
     try {
-      await resendVerificationEmail()
+      await resendVerificationEmail(email)
       setResendSuccess(true)
       setShowResendOption(false)
     } catch (err) {

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { sessionService } from '../services/sessionService'
 import { analyticsService } from '../services/analyticsService'
+import { useProfileStore } from '../stores/profileStore'
+import PreferencesModal from '../components/PreferencesModal'
 import { Play, TrendingUp, Award } from 'lucide-react'
 
 export default function Dashboard() {
@@ -13,9 +15,15 @@ export default function Dashboard() {
   const [creating, setCreating] = useState(false)
   
   const navigate = useNavigate()
+  const { showPreferencesModal, setShowModal, initPreferences } = useProfileStore()
 
   useEffect(() => {
     loadData()
+  }, [])
+
+  // Check preferences on component mount
+  useEffect(() => {
+    initPreferences()
   }, [])
 
   const loadData = async () => {
@@ -50,7 +58,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <p>Loading...</p>
       </div>
     )
   }
@@ -221,7 +229,12 @@ export default function Dashboard() {
             </table>
           </div>
         )}
-      </div>
+
+      <PreferencesModal 
+        isOpen={showPreferencesModal} 
+        onClose={() => setShowModal(false)}
+      />
+    </div>
     </div>
   )
 }
