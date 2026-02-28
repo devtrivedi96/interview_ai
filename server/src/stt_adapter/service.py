@@ -6,7 +6,7 @@ import logging
 from fastapi import UploadFile, HTTPException
 from openai import AsyncOpenAI
 
-from utils.config import settings
+from src.utils.config import settings
 
 logger = logging.getLogger(__name__)
 

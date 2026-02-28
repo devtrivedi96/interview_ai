@@ -9,8 +9,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from firebase_admin import auth as firebase_auth
 
-from db.firebase_client import get_db, Collections
-from db.models import User
+from src.db.firebase_client import get_db, Collections
+from src.db.models import User
 
 security = HTTPBearer()
 

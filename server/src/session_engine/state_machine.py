@@ -6,8 +6,8 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 import logging
 
-from db.models import SessionState, InterviewSession
-from db.firebase_client import get_db, Collections
+from src.db.models import SessionState, InterviewSession
+from src.db.firebase_client import get_db, Collections
 
 logger = logging.getLogger(__name__)
 

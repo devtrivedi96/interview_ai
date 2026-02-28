@@ -1,6 +1,6 @@
 from typing import List
 from pydantic_settings import BaseSettings
-from pydantic import AnyHttpUrl
+from pydantic import ConfigDict
 
 
 class Settings(BaseSettings):
@@ -38,18 +38,43 @@ class Settings(BaseSettings):
     # STT
     STT_PROVIDER: str = "openai"
     STT_MODEL: str = "whisper-1"
+    STT_MAX_RETRIES: int = 2
+    STT_TIMEOUT_SEC: int = 30
+
+    # Audio Settings
+    MAX_AUDIO_SIZE_MB: int = 25
+    AUDIO_QUALITY_THRESHOLD: float = 0.6
+    SUPPORTED_AUDIO_FORMATS: List[str] = ["wav", "mp3", "m4a", "webm"]
+
+    # Session Settings
+    DEFAULT_SESSION_DURATION_MIN: int = 30
+    MIN_QUESTIONS_PER_SESSION: int = 3
+    MAX_QUESTIONS_PER_SESSION: int = 10
 
     # Evaluation
     MIN_EVAL_CONFIDENCE: float = 0.5
+    EVALUATION_TIMEOUT_SEC: int = 10
+
+    # Privacy & Retention
+    AUDIO_RETENTION_DAYS: int = 30
+    TRANSCRIPT_RETENTION_DAYS: int = 90
+    REQUIRE_AUDIO_CONSENT: bool = True
+
+    # Performance Targets
+    TARGET_EVAL_LATENCY_P95_SEC: float = 10.0
+    TARGET_STT_LATENCY_P95_SEC: float = 5.0
+
+    # Analytics
+    ENABLE_ANALYTICS: bool = True
+    LOG_LEVEL: str = "INFO"
 
     # Email (Brevo)
     BREVO_API_KEY: str = ""
     BREVO_SENDER_EMAIL: str = ""
     BREVO_SENDER_NAME: str = "Interview AI"
-    EMAIL_VERIFICATION_REDIRECT_URL: AnyHttpUrl = "http://localhost:5173/login"
+    EMAIL_VERIFICATION_REDIRECT_URL: str = "http://localhost:5173/login"
 
-    class Config:
-        env_file = ".env"
+    model_config = ConfigDict(env_file=".env")
 
 
 settings = Settings()

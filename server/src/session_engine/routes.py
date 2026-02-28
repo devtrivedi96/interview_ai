@@ -7,14 +7,14 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
-from db.firebase_client import get_db, Collections
-from db.models import User, InterviewSession, SessionState, InterviewMode
-from auth.security import get_current_user_firebase, require_audio_consent
-from session_engine.engine import InterviewEngine
-from session_engine.state_machine import SessionStateMachine
-from stt_adapter.service import STTService
-from ai_evaluator.service import AIEvaluatorService
-from utils.config import settings
+from src.db.firebase_client import get_db, Collections
+from src.db.models import User, InterviewSession, SessionState, InterviewMode
+from src.auth.security import get_current_user_firebase, require_audio_consent
+from src.session_engine.engine import InterviewEngine
+from src.session_engine.state_machine import SessionStateMachine
+from src.stt_adapter.service import STTService
+from src.ai_evaluator.service import AIEvaluatorService
+from src.utils.config import settings
 
 router = APIRouter()
 

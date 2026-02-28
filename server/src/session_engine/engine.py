@@ -6,13 +6,13 @@ from typing import Optional, List, Tuple
 import random
 import logging
 
-from db.models import (
+from src.db.models import (
     InterviewSession, SessionQuestion, Question,
     AnswerEvaluation, SessionState, InterviewMode
 )
-from db.firebase_client import get_db, Collections
-from session_engine.state_machine import SessionStateMachine
-from utils.config import settings
+from src.db.firebase_client import get_db, Collections
+from src.session_engine.state_machine import SessionStateMachine
+from src.utils.config import settings
 
 logger = logging.getLogger(__name__)
 
