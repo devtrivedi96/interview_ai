@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
-import { Mic, LogOut, BarChart3, Home } from "lucide-react";
+import { Mic, LogOut, BarChart3, Home, User } from "lucide-react";
 
 export default function Layout() {
   const { isAuthenticated, user, logout } = useAuthStore();
@@ -40,6 +40,13 @@ export default function Layout() {
                   >
                     <BarChart3 className="w-5 h-5" />
                     <span>Analytics</span>
+                  </Link>
+                  <Link
+                    to="/profile"
+                    className="flex items-center space-x-1 text-gray-700 hover:text-primary-600"
+                  >
+                    <User className="w-5 h-5" />
+                    <span>Profile</span>
                   </Link>
                   <div className="flex items-center space-x-4">
                     <span className="text-sm text-gray-600">{user?.email}</span>
