@@ -6,9 +6,9 @@ from fastapi import APIRouter, Depends
 from datetime import datetime, timedelta
 from typing import Optional
 
-from db.firebase_client import get_db, Collections
-from db.models import User, InterviewSession
-from auth.security import get_current_user_firebase
+from src.db.firebase_client import get_db, Collections
+from src.db.models import User, InterviewSession
+from src.auth.security import get_current_user_firebase
 
 router = APIRouter()
 

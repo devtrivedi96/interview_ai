@@ -1,16 +1,23 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import logging
 
-from utils.config import settings
+from src.utils.config import settings
+from src.auth import firebase_auth
+from src.auth.routes import router as auth_router
+from src.session_engine.routes import router as sessions_router
+from src.analytics.routes import router as analytics_router
 
-from auth.routes import router as auth_router
-from session_engine.routes import router as sessions_router
-from analytics.routes import router as analytics_router
+logger = logging.getLogger(__name__)
 
-
-def create_app() -> FastAPI:
+def create_app():
     app = FastAPI(title=settings.APP_NAME)
-
+    
+    # Initialize Firebase - this will fall back to mock auth if Firebase isn't available
+    logger.info("Initializing Firebase Authentication...")
+    firebase_auth.initialize_firebase()
+    logger.info(f"Using mock auth: {firebase_auth._use_mock_auth}")
+    
     # CORS
     origins = settings.CORS_ORIGINS if isinstance(settings.CORS_ORIGINS, list) else [settings.CORS_ORIGINS]
     app.add_middleware(

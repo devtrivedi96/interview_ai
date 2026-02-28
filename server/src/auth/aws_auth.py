@@ -20,7 +20,7 @@ except Exception:
 
 from jose import jwt
 from passlib.hash import sha256_crypt
-from utils.config import settings
+from src.utils.config import settings
 
 logger = logging.getLogger(__name__)
 

@@ -8,9 +8,9 @@ from typing import Dict
 from openai import AsyncOpenAI
 import jsonschema
 
-from db.models import InterviewSession, SessionQuestion, AnswerEvaluation, InterviewMode
-from ai_evaluator.prompts import get_evaluation_prompt, get_rubric_dimensions
-from utils.config import settings
+from src.db.models import InterviewSession, SessionQuestion, AnswerEvaluation, InterviewMode
+from src.ai_evaluator.prompts import get_evaluation_prompt, get_rubric_dimensions
+from src.utils.config import settings
 
 logger = logging.getLogger(__name__)
 

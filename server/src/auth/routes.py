@@ -8,11 +8,11 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 
-from auth import firebase_auth
-from auth.security import get_current_user_firebase
-from db.firebase_client import get_db, Collections
-from db.models import User
-from utils.config import settings
+from src.auth import firebase_auth
+from src.auth.security import get_current_user_firebase
+from src.db.firebase_client import get_db, Collections
+from src.db.models import User
+from src.utils.config import settings
 
 router = APIRouter()
 

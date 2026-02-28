@@ -2,7 +2,7 @@
 LLM prompt templates for evaluation
 Defines rubrics and evaluation criteria
 """
-from db.models import InterviewMode
+from src.db.models import InterviewMode
 
 
 def get_rubric_dimensions(mode: InterviewMode) -> dict:
