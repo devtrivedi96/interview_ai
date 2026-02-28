@@ -8,10 +8,9 @@ import logging
 
 from src.db.models import (
     InterviewSession, SessionQuestion, Question,
-    AnswerEvaluation, SessionState, InterviewMode
+    AnswerEvaluation, InterviewMode
 )
 from src.db.firebase_client import get_db, Collections
-from src.session_engine.state_machine import SessionStateMachine
 from src.utils.config import settings
 
 logger = logging.getLogger(__name__)
@@ -65,9 +64,10 @@ class InterviewEngine:
         limit: int = 2
     ) -> List[Tuple[SessionQuestion, Optional[AnswerEvaluation]]]:
         """Get recent questions with their evaluations"""
+        from google.cloud import firestore
         questions = self.db.collection(Collections.SESSION_QUESTIONS)\
             .where('session_id', '==', session_id)\
-            .order_by('created_at', direction='DESCENDING')\
+            .order_by('created_at', direction=firestore.Query.DESCENDING)\
             .limit(limit)\
             .get()
         

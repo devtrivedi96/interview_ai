@@ -6,9 +6,6 @@
 server/.env
 client/.env
 server/.env.example
-firebase-credentials.json
-server/firebase-credentials.json
-*-firebase-adminsdk-*.json
 aws-credentials.json
 .aws-credentials
 .aws/credentials

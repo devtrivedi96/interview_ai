@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '../stores/authStore'
+import { auth } from '../config/firebase'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api/v1',
@@ -14,6 +15,11 @@ api.interceptors.request.use(
     const token = useAuthStore.getState().token
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
+    }
+    const currentUser = auth.currentUser
+    if (currentUser?.uid) {
+      config.headers['X-User-Id'] = currentUser.uid
+      config.headers['X-User-Email'] = currentUser.email || ''
     }
     return config
   },
