@@ -6,13 +6,13 @@ Supports both OpenAI API and local Whisper model
 
 import logging
 import os
+import sys
 import tempfile
 import time
 import uuid
 import boto3
 from fastapi import UploadFile, HTTPException
 from openai import AsyncOpenAI
-import whisper
 
 from src.utils.config import settings
 
@@ -56,6 +56,19 @@ class STTService:
     def _get_whisper_model():
         """Get or load local Whisper model (cached)"""
         if STTService._whisper_model is None:
+            try:
+                import whisper
+            except TypeError as e:
+                if "argument of type 'NoneType' is not iterable" in str(e):
+                    # Known Windows issue with whisper library - set up ctypes fallback
+                    import sys
+                    import ctypes
+                    if sys.platform == "win32":
+                        # On Windows, manually set CDLL to prevent the libc lookup issue
+                        os.environ["CYGWIN"] = "nodosfilewarning"
+                    import whisper
+                else:
+                    raise
             logger.info(f"Loading Whisper {settings.WHISPER_MODEL_SIZE} model on {settings.WHISPER_DEVICE}...")
             STTService._whisper_model = whisper.load_model(
                 settings.WHISPER_MODEL_SIZE,

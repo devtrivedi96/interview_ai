@@ -18,6 +18,7 @@ class Collections:
     USERS = "users"
     SESSIONS = "sessions"
     SESSION_QUESTIONS = "session_questions"
+    ANSWERS = "answers"
     EVALUATIONS = "evaluations"
     QUESTIONS = "questions"
 
@@ -114,6 +115,10 @@ class _InMemoryQuery:
 
         return docs
 
+    def stream(self):
+        """Firestore compatibility: stream() yields docs like get()."""
+        return self.get()
+
 
 class _InMemoryCollection:
     def __init__(self, store: dict, name: str):
@@ -169,7 +174,7 @@ class _InMemoryDB:
 
 
 def get_db():
-    """Return Firestore client; fail fast when unavailable."""
+    """Return Firestore client; use in-memory fallback for local/dev when unavailable."""
     global _db_client
 
     if _db_client is not None:
@@ -195,6 +200,20 @@ def get_db():
         return _db_client
     except Exception as e:
         logger.error(f"Firestore initialization failed: {e}")
+        is_dev_env = settings.DEBUG or str(settings.ENVIRONMENT).lower() in {
+            "development",
+            "dev",
+            "local",
+            "test",
+        }
+        if is_dev_env:
+            logger.warning(
+                "Falling back to in-memory DB for local/dev. "
+                "Data will not persist across restarts."
+            )
+            _db_client = _InMemoryDB()
+            return _db_client
+
         raise RuntimeError(
             "Firestore is required but unavailable. "
             "Configure Application Default Credentials or FIREBASE_CREDENTIALS_PATH."

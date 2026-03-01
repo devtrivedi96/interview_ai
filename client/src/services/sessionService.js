@@ -1,5 +1,11 @@
 import api from './api'
 
+const normalizeQuestion = (payload) => {
+  if (!payload || typeof payload !== 'object') return payload
+  const id = payload.id || payload.question_id
+  return id ? { ...payload, id } : payload
+}
+
 export const sessionService = {
   // Get dynamic interview cards
   getInterviewCards: async () => {
@@ -9,6 +15,9 @@ export const sessionService = {
 
   // Create new session
   createSession: async (mode, difficultyStart = 3) => {
+    if (!mode) {
+      throw new Error('Interview mode is required to create a session')
+    }
     const response = await api.post('/sessions', {
       mode,
       difficulty_start: difficultyStart
@@ -19,13 +28,13 @@ export const sessionService = {
   // Start session
   startSession: async (sessionId) => {
     const response = await api.post(`/sessions/${sessionId}/start`)
-    return response.data
+    return normalizeQuestion(response.data)
   },
 
   // Get next question
   getNextQuestion: async (sessionId) => {
     const response = await api.post(`/sessions/${sessionId}/questions/next`)
-    return response.data
+    return normalizeQuestion(response.data)
   },
 
   // Submit answer
@@ -76,3 +85,4 @@ export const sessionService = {
     return response.data
   }
 }
+

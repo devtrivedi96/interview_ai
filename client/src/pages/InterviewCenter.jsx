@@ -422,9 +422,9 @@ export default function InterviewCenter() {
         const data = await sessionService.getInterviewCards();
         if (Array.isArray(data?.cards) && data.cards.length > 0) {
           setCards(data.cards);
-          if (!data.cards.find((c) => (c.key || c.mode) === selectedMode)) {
+          if (!data.cards.find((c) => (c.key || c.mode || c.id) === selectedMode)) {
             const first = data.cards[0];
-            setSelectedMode(first.key || first.mode);
+            setSelectedMode(first.key || first.mode || first.id);
             setDifficulty(Number(first.difficulty_start || 3));
           }
         }
@@ -454,7 +454,7 @@ export default function InterviewCenter() {
     }
   };
 
-  const activeCard = cards.find((c) => (c.key || c.mode) === selectedMode);
+  const activeCard = cards.find((c) => (c.key || c.mode || c.id) === selectedMode);
   const activeMeta = MODE_META[selectedMode] || {
     color: "#d4622a",
     iconBg: "#fde8dc",
@@ -487,7 +487,7 @@ export default function InterviewCenter() {
           {cardsLoading
             ? [0, 1, 2, 3].map((i) => <div key={i} className="ic-skeleton" />)
             : cards.map((mode) => {
-                const key = mode.key || mode.mode;
+                const key = mode.key || mode.mode || mode.id;
                 const meta = MODE_META[key] || {
                   color: "#d4622a",
                   iconBg: "#fde8dc",

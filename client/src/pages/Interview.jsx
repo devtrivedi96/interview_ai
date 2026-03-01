@@ -4,7 +4,6 @@ import { sessionService } from "../services/sessionService";
 import {
   Mic,
   Square,
-  Loader,
   Volume2,
   ChevronRight,
   CheckCircle2,
@@ -825,6 +824,45 @@ const STYLE = `
   }
 `;
 
+const MAX_QUESTIONS_PER_SESSION = Number(
+  import.meta.env.VITE_MAX_QUESTIONS_PER_SESSION ?? 10,
+);
+
+const formatScore = (value, digits = 1, fallback = "0.0") => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num.toFixed(digits) : fallback;
+};
+
+const deriveDimensionScores = (evaluation) => {
+  if (!evaluation) return [];
+
+  if (
+    evaluation.dimension_scores &&
+    typeof evaluation.dimension_scores === "object"
+  ) {
+    return Object.entries(evaluation.dimension_scores).map(
+      ([key, value], index) => ({
+        key,
+        label: `D${index + 1}`,
+        value: Number(value),
+      }),
+    );
+  }
+
+  const scores = [];
+  for (let i = 1; i <= 5; i += 1) {
+    const value = evaluation[`score_dimension_${i}`];
+    if (value !== undefined && value !== null) {
+      scores.push({
+        key: `dimension_${i}`,
+        label: `D${i}`,
+        value: Number(value),
+      });
+    }
+  }
+  return scores;
+};
+
 export default function Interview() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
@@ -833,13 +871,19 @@ export default function Interview() {
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [evaluation, setEvaluation] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [isLoadingQuestion, setIsLoadingQuestion] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [isSpeakingQuestion, setIsSpeakingQuestion] = useState(false);
   const [autoFlow, setAutoFlow] = useState(true);
   const [handsFree, setHandsFree] = useState(true);
   const [autoNextCountdown, setAutoNextCountdown] = useState(0);
   const [questionIndex, setQuestionIndex] = useState(1);
+  const [questionsCount, setQuestionsCount] = useState(0);
+  const [summary, setSummary] = useState(null);
+  const [isFetchingSummary, setIsFetchingSummary] = useState(false);
+  const [isFetchingTranscript, setIsFetchingTranscript] = useState(false);
+  const [hasReachedMax, setHasReachedMax] = useState(false);
   const [theme, setTheme] = useState("dark");
 
   const mediaRecorderRef = useRef(null);
@@ -863,6 +907,54 @@ export default function Interview() {
     localStorage.setItem("interview-theme", newTheme);
   };
 
+  const showError = (message) => {
+    setError(message);
+    if (window?.toast?.error) {
+      window.toast.error(message);
+    }
+  };
+
+  const resetAutoNextTimer = () => {
+    if (autoNextTimerRef.current) {
+      clearInterval(autoNextTimerRef.current);
+      autoNextTimerRef.current = null;
+    }
+    setAutoNextCountdown(0);
+  };
+
+  const fetchTranscriptFromUrl = async (url) => {
+    if (!url) return;
+    setIsFetchingTranscript(true);
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Transcript fetch failed");
+      const data = await response.json();
+      const text =
+        data?.transcript ?? data?.text ?? data?.transcript_text ?? "";
+      setTranscript(text || "");
+    } catch (err) {
+      console.error("Transcript fetch error", err);
+      showError("Could not load transcript from storage.");
+    } finally {
+      setIsFetchingTranscript(false);
+    }
+  };
+
+  const fetchSummary = async () => {
+    setIsFetchingSummary(true);
+    setSummary(null);
+    setError("");
+    try {
+      const data = await sessionService.getSummary(sessionId);
+      setSummary(data);
+    } catch (err) {
+      console.error(err);
+      showError("Unable to load final analysis. Please try again.");
+    } finally {
+      setIsFetchingSummary(false);
+    }
+  };
+
   useEffect(() => {
     if (question?.question_text) speakQuestion(question.question_text);
     return () => {
@@ -872,7 +964,14 @@ export default function Interview() {
   }, [question?.id]);
 
   useEffect(() => {
-    if (!evaluation || !autoFlow) return;
+    if (!evaluation || summary) return;
+    if (hasReachedMax) {
+      const timer = setTimeout(() => {
+        fetchSummary();
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
+    if (!autoFlow) return;
     setAutoNextCountdown(4);
     autoNextTimerRef.current = setInterval(() => {
       setAutoNextCountdown((prev) => {
@@ -887,7 +986,7 @@ export default function Interview() {
     return () => {
       if (autoNextTimerRef.current) clearInterval(autoNextTimerRef.current);
     };
-  }, [evaluation, autoFlow]);
+  }, [evaluation, autoFlow, hasReachedMax, summary]);
 
   const speakQuestion = (text) => {
     if (!("speechSynthesis" in window) || !text) return;
@@ -907,37 +1006,48 @@ export default function Interview() {
   };
 
   const loadNextQuestion = async () => {
-    if (autoNextTimerRef.current) {
-      clearInterval(autoNextTimerRef.current);
-      autoNextTimerRef.current = null;
-    }
-    setAutoNextCountdown(0);
-    setLoading(true);
+    resetAutoNextTimer();
+    if (summary) setSummary(null);
+    setIsLoadingQuestion(true);
     setError("");
     setEvaluation(null);
     setTranscript("");
+    setHasReachedMax(false);
     try {
       const data = await sessionService.getNextQuestion(sessionId);
       setQuestion(data);
-      setQuestionIndex((prev) => prev + (question ? 1 : 0));
+      const nextCount =
+        typeof data?.questions_count === "number"
+          ? data.questions_count
+          : questionsCount + 1;
+      setQuestionsCount(nextCount);
+      setHasReachedMax(nextCount >= MAX_QUESTIONS_PER_SESSION);
+      setQuestionIndex(nextCount || 1);
     } catch (err) {
-      if (err.response?.status === 400)
-        navigate(`/session/${sessionId}/summary`);
-      else setError("Failed to load question. Please try again.");
+      if (err?.response?.status === 400) {
+        setHasReachedMax(true);
+        await fetchSummary();
+      } else {
+        console.error(err);
+        showError("Failed to load question. Please try again.");
+      }
     } finally {
-      setLoading(false);
+      setIsLoadingQuestion(false);
+      setIsRecording(false);
     }
   };
 
   const startRecording = async () => {
-    if (!question?.id) {
+    const currentQuestionId = question?.id || question?.question_id;
+    if (!currentQuestionId) {
       setError("Question is not ready yet. Please wait a moment.");
       return;
     }
+    if (summary || isSubmitting || isLoadingQuestion) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
-      const questionIdAtRecordStart = question.id;
+      const questionIdAtRecordStart = currentQuestionId;
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
       startTimeRef.current = Date.now();
@@ -967,7 +1077,7 @@ export default function Interview() {
   };
 
   const submitAnswer = async (audioBlob, duration, questionId) => {
-    setLoading(true);
+    setIsSubmitting(true);
     setError("");
     try {
       if (!questionId) throw new Error("Question ID missing");
@@ -980,28 +1090,94 @@ export default function Interview() {
         alert("Audio file is empty. Please record your answer again.");
         return;
       }
-      console.log("Uploading audio file size:", audioFile.size, "bytes");
       const result = await sessionService.submitAnswer(sessionId, questionId, {
         audioFile,
         audioDuration: duration,
       });
       setEvaluation(result);
-      if (result.transcript) setTranscript(result.transcript);
-    } catch {
-      setError("Failed to evaluate answer. Please try again.");
+      const returnedCount =
+        typeof result?.questions_count === "number"
+          ? result.questions_count
+          : questionsCount;
+      if (returnedCount) {
+        setQuestionsCount(returnedCount);
+        setHasReachedMax(returnedCount >= MAX_QUESTIONS_PER_SESSION);
+      }
+      if (result?.transcript) setTranscript(result.transcript);
+      else if (result?.transcript_text) setTranscript(result.transcript_text);
+      else if (result?.transcript_url || result?.transcript_json_url) {
+        fetchTranscriptFromUrl(result.transcript_url || result.transcript_json_url);
+      }
+    } catch (err) {
+      console.error(err);
+      showError("Failed to evaluate answer. Please try again.");
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   const handleComplete = async () => {
     try {
       await sessionService.completeSession(sessionId);
-    } catch {}
-    navigate(`/session/${sessionId}/summary`);
+    } catch (err) {
+      console.error(err);
+    }
+    await fetchSummary();
   };
 
-  if (loading && !question)
+  const dimensionScores = deriveDimensionScores(evaluation);
+  const compositeScore =
+    Number(
+      evaluation?.composite_score ??
+        (dimensionScores.length
+          ? dimensionScores.reduce(
+              (acc, curr) => acc + (Number(curr.value) || 0),
+              0,
+            ) / dimensionScores.length
+          : 0),
+    ) || 0;
+  const confidencePct = formatScore(
+    (Number(evaluation?.eval_confidence) || 0) * 100,
+    0,
+    "0",
+  );
+  const clarityScore =
+    typeof evaluation?.clarity_score === "number"
+      ? evaluation.clarity_score
+      : null;
+  const strengths = Array.isArray(evaluation?.strengths)
+    ? evaluation.strengths
+    : [];
+  const improvements = Array.isArray(evaluation?.improvements)
+    ? evaluation.improvements
+    : [];
+
+  const summaryStrengths = Array.isArray(summary?.strengths)
+    ? summary.strengths
+    : Array.isArray(summary?.score?.strengths)
+      ? summary.score.strengths
+      : [];
+  const summaryImprovements = Array.isArray(summary?.improvements)
+    ? summary.improvements
+    : Array.isArray(summary?.score?.improvements)
+      ? summary.score.improvements
+      : [];
+  const summaryTotalScore =
+    Number(
+      summary?.total_score ??
+        summary?.score?.total_score ??
+        summary?.score?.composite_score ??
+        summary?.score,
+    ) || 0;
+  const summaryDimensionAverages =
+    summary?.dimension_averages ?? summary?.score?.dimension_averages ?? {};
+  const trend =
+    summary?.trend ||
+    (summary?.difficulty_progression
+      ? `Difficulty ${summary.difficulty_progression.start} -> ${summary.difficulty_progression.end}`
+      : undefined);
+
+  if ((isLoadingQuestion || isFetchingSummary) && !question && !summary)
     return (
       <>
         <style>{STYLE}</style>
@@ -1013,6 +1189,104 @@ export default function Interview() {
         </div>
       </>
     );
+
+  if (summary) {
+    return (
+      <>
+        <style>{STYLE}</style>
+        <div className="iv-root">
+          <button
+            className="iv-theme-toggle"
+            onClick={toggleTheme}
+            aria-label="Toggle theme"
+          >
+            {theme === "dark" ? <Sun size={22} /> : <Moon size={22} />}
+          </button>
+
+          <div className="iv-header">
+            <h1 className="iv-q-label">Final Analysis</h1>
+            <div className="iv-badges">
+              <span className="iv-badge">
+                {summary?.questions_count ?? questionsCount} Questions
+              </span>
+              <span className="iv-badge">Session Complete</span>
+            </div>
+          </div>
+
+          <div className="iv-score-hero">
+            <div className="iv-score-label">Overall Score</div>
+            <div className="iv-score-value">
+              {formatScore(summaryTotalScore, 2, "0.00")}
+              <span className="iv-score-denom">/5</span>
+            </div>
+            {trend && <div className="iv-confidence">Trend: {trend}</div>}
+          </div>
+
+          {summaryDimensionAverages &&
+            Object.keys(summaryDimensionAverages).length > 0 && (
+              <div className="iv-dims">
+                {Object.entries(summaryDimensionAverages).map(
+                  ([key, value], i) => (
+                    <div key={key} className="iv-dim" style={{ "--i": i }}>
+                      <div className="iv-dim-score">
+                        {formatScore(value, 2, "0.00")}
+                      </div>
+                      <div className="iv-dim-label">{key}</div>
+                    </div>
+                  ),
+                )}
+              </div>
+            )}
+
+          <div className="iv-feedback">
+            <div className="iv-fb-card" style={{ "--i": 0 }}>
+              <div className="iv-fb-title green">
+                <CheckCircle2 size={15} />
+                Strengths
+              </div>
+              {(summaryStrengths.length
+                ? summaryStrengths
+                : ["Keep practicing consistently."]
+              ).map((s, i) => (
+                <div key={i} className="iv-fb-item">
+                  <span className="iv-fb-icon green">
+                    <CheckCircle2 size={13} />
+                  </span>
+                  {s}
+                </div>
+              ))}
+            </div>
+            <div className="iv-fb-card" style={{ "--i": 1 }}>
+              <div className="iv-fb-title amber">
+                <ArrowRight size={15} />
+                Improvements
+              </div>
+              {(summaryImprovements.length
+                ? summaryImprovements
+                : ["Review clarity and structure for future sessions."]
+              ).map((s, i) => (
+                <div key={i} className="iv-fb-item">
+                  <span className="iv-fb-icon amber">
+                    <ArrowRight size={13} />
+                  </span>
+                  {s}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="iv-actions">
+            <button
+              className="iv-btn-primary"
+              onClick={() => navigate("/dashboard")}
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -1091,7 +1365,9 @@ export default function Interview() {
               type="button"
               className={`iv-record-btn ${isRecording ? "recording" : "idle"}`}
               onClick={isRecording ? stopRecording : startRecording}
-              disabled={loading || !question || isSpeakingQuestion}
+              disabled={
+                isSubmitting || isLoadingQuestion || !question || isSpeakingQuestion
+              }
             >
               {isRecording ? (
                 <Square size={28} color="#fff" />
@@ -1106,14 +1382,14 @@ export default function Interview() {
                 Recording… speak clearly
               </div>
             )}
-            {!isRecording && !loading && (
+            {!isRecording && !isSubmitting && !isLoadingQuestion && (
               <div className="iv-record-status">
                 {isSpeakingQuestion
                   ? "Listening to question…"
                   : "Tap to start recording"}
               </div>
             )}
-            {loading && (
+            {isSubmitting && (
               <div className="iv-evaluating">
                 <div
                   className="iv-loader-ring"
@@ -1140,35 +1416,39 @@ export default function Interview() {
             <div className="iv-score-hero">
               <div className="iv-score-label">Your Score</div>
               <div className="iv-score-value">
-                {evaluation.composite_score.toFixed(1)}
+                {formatScore(compositeScore, 1, "0.0")}
                 <span className="iv-score-denom">/5</span>
               </div>
               <div className="iv-confidence">
-                Confidence: {(evaluation.eval_confidence * 100).toFixed(0)}%
+                Confidence: {confidencePct}%
               </div>
             </div>
 
             {/* Dimension scores */}
-            <div className="iv-dims">
-              {Object.entries(evaluation.dimension_scores).map(
-                ([dim, score], i) => (
-                  <div key={dim} className="iv-dim" style={{ "--i": i }}>
-                    <div className="iv-dim-score">{score.toFixed(1)}</div>
-                    <div className="iv-dim-label">D{i + 1}</div>
+            {dimensionScores.length > 0 && (
+              <div className="iv-dims">
+                {dimensionScores.map(({ key, label, value }, i) => (
+                  <div key={key} className="iv-dim" style={{ "--i": i }}>
+                    <div className="iv-dim-score">
+                      {formatScore(value, 1, "0.0")}
+                    </div>
+                    <div className="iv-dim-label">{label}</div>
                   </div>
-                ),
-              )}
-            </div>
+                ))}
+              </div>
+            )}
 
             {/* Transcript */}
-            {transcript && (
+            {(transcript || isFetchingTranscript) && (
               <div className="iv-transcript">
                 <div className="iv-transcript-label">What AI Heard</div>
-                <div className="iv-transcript-text">{transcript}</div>
-                {typeof evaluation.clarity_score === "number" && (
+                <div className="iv-transcript-text">
+                  {isFetchingTranscript ? "Loading transcript…" : transcript}
+                </div>
+                {clarityScore !== null && (
                   <div className="iv-clarity">
                     Clarity:{" "}
-                    <strong>{evaluation.clarity_score.toFixed(2)}</strong>
+                    <strong>{formatScore(clarityScore, 2, "0.00")}</strong>
                     {!evaluation.clarity_ok && (
                       <span className="iv-clarity-warn">
                         {" "}
@@ -1194,7 +1474,7 @@ export default function Interview() {
                   <CheckCircle2 size={15} />
                   Strengths
                 </div>
-                {evaluation.strengths.map((s, i) => (
+                {(strengths.length ? strengths : ["Great structure and clarity."]).map((s, i) => (
                   <div key={i} className="iv-fb-item">
                     <span className="iv-fb-icon green">
                       <CheckCircle2 size={13} />
@@ -1208,7 +1488,10 @@ export default function Interview() {
                   <ArrowRight size={15} />
                   Areas to Improve
                 </div>
-                {evaluation.improvements.map((s, i) => (
+                {(improvements.length
+                  ? improvements
+                  : ["Add more concrete examples to back your claims."]
+                ).map((s, i) => (
                   <div key={i} className="iv-fb-item">
                     <span className="iv-fb-icon amber">
                       <ArrowRight size={13} />
@@ -1221,8 +1504,16 @@ export default function Interview() {
 
             {/* Actions */}
             <div className="iv-actions">
-              <button className="iv-btn-primary" onClick={loadNextQuestion}>
-                {autoFlow && autoNextCountdown > 0 ? (
+              <button
+                className="iv-btn-primary"
+                onClick={() =>
+                  hasReachedMax ? fetchSummary() : loadNextQuestion()
+                }
+                disabled={isLoadingQuestion || isSubmitting}
+              >
+                {hasReachedMax ? (
+                  "View Summary"
+                ) : autoFlow && autoNextCountdown > 0 ? (
                   <>
                     <span className="iv-countdown">{autoNextCountdown}</span>{" "}
                     Next Question
@@ -1243,3 +1534,4 @@ export default function Interview() {
     </>
   );
 }
+

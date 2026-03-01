@@ -1021,8 +1021,8 @@ export default function Dashboard() {
                 className="start-select"
               >
                 {interviewOptions.map((c) => (
-                  <option key={c.mode} value={c.mode}>
-                    {c.title || c.mode}
+                  <option key={c.mode || c.key || c.id} value={c.mode || c.key || c.id}>
+                    {c.title || c.mode || c.key || c.id}
                   </option>
                 ))}
               </select>
