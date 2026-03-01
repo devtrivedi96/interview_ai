@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import List
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -54,12 +54,21 @@ class Settings(BaseSettings):
     AWS_BEDROCK_REGION: str = ""
     AWS_BEDROCK_MODEL_ID: str = ""
     AWS_BEDROCK_MAX_TOKENS: int = 1000
+    AWS_BEARER_TOKEN_BEDROCK: str = ""
 
     # STT
     STT_PROVIDER: str = "openai"
     STT_MODEL: str = "whisper-1"
     STT_MAX_RETRIES: int = 2
     STT_TIMEOUT_SEC: int = 30
+    STT_AWS_LANGUAGE_CODE: str = "en-US"
+    STT_AWS_JOB_TIMEOUT_SEC: int = 180
+    STT_AWS_POLL_INTERVAL_SEC: int = 3
+
+    # AWS Transcribe
+    AWS_TRANSCRIBE_S3_BUCKET: str = ""
+    AWS_TRANSCRIBE_S3_PREFIX: str = "stt-input"
+    AWS_TRANSCRIBE_S3_REGION: str = ""
 
     # Audio Settings
     MAX_AUDIO_SIZE_MB: int = 25
@@ -94,7 +103,22 @@ class Settings(BaseSettings):
     BREVO_SENDER_NAME: str = "Interview AI"
     EMAIL_VERIFICATION_REDIRECT_URL: str = "http://localhost:5173/login"
 
-    model_config = ConfigDict(env_file=str(ENV_FILE), env_file_encoding="utf-8")
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def _normalize_debug(cls, v):
+        if isinstance(v, str):
+            normalized = v.strip().lower()
+            if normalized in {"release", "prod", "production", "0", "false", "no", "off"}:
+                return False
+            if normalized in {"dev", "development", "1", "true", "yes", "on"}:
+                return True
+        return v
+
+    model_config = ConfigDict(
+        env_file=str(ENV_FILE),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 
 settings = Settings()
