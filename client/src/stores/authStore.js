@@ -7,8 +7,84 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
-import api from "../services/api";
-import { auth } from "../config/firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { auth, db } from "../config/firebase";
+
+const nowIso = () => new Date().toISOString();
+
+const toIsoString = (value) => {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value?.toDate === "function") return value.toDate().toISOString();
+  return null;
+};
+
+const syncUserDoc = async (firebaseUser) => {
+  const userRef = doc(db, "users", firebaseUser.uid);
+  const snap = await getDoc(userRef);
+  const now = nowIso();
+
+  if (snap.exists()) {
+    const data = snap.data() || {};
+    const createdAt =
+      toIsoString(data.created_at) ||
+      firebaseUser.metadata?.creationTime ||
+      now;
+    const mergedUser = {
+      id: firebaseUser.uid,
+      email: data.email || firebaseUser.email || "",
+      email_verified:
+        data.email_verified ?? firebaseUser.emailVerified ?? true,
+      audio_consent: Boolean(data.audio_consent),
+      created_at: createdAt,
+      last_login: now,
+      profile: data.profile || {},
+    };
+
+    await setDoc(
+      userRef,
+      {
+        email: mergedUser.email,
+        email_verified: mergedUser.email_verified,
+        audio_consent: mergedUser.audio_consent,
+        created_at: createdAt,
+        last_login: now,
+        updated_at: now,
+        profile: mergedUser.profile,
+      },
+      { merge: true },
+    );
+
+    return mergedUser;
+  }
+
+  const newUser = {
+    id: firebaseUser.uid,
+    email: firebaseUser.email || "",
+    email_verified: firebaseUser.emailVerified ?? true,
+    audio_consent: false,
+    created_at: firebaseUser.metadata?.creationTime || now,
+    last_login: now,
+    profile: {},
+  };
+
+  await setDoc(
+    userRef,
+    {
+      email: newUser.email,
+      email_verified: newUser.email_verified,
+      audio_consent: false,
+      created_at: newUser.created_at,
+      last_login: now,
+      updated_at: now,
+      profile: {},
+    },
+    { merge: true },
+  );
+
+  return newUser;
+};
 
 export const useAuthStore = create(
   persist(
@@ -28,13 +104,11 @@ export const useAuthStore = create(
 
           try {
             const token = await getIdToken(firebaseUser, true);
-            const response = await api.get("/auth/me", {
-              headers: { Authorization: `Bearer ${token}` },
-            });
+            const userProfile = await syncUserDoc(firebaseUser);
 
             set({
               token,
-              user: response.data,
+              user: userProfile,
               isAuthenticated: true,
               loading: false,
               error: null,
@@ -50,6 +124,7 @@ export const useAuthStore = create(
         set({ loading: true, error: null });
         try {
           await createUserWithEmailAndPassword(auth, email, password);
+          localStorage.setItem("pending_audio_consent", audioConsent ? "true" : "false");
           await signOut(auth);
 
           set({ loading: false });
@@ -71,21 +146,25 @@ export const useAuthStore = create(
           const userCredential = await signInWithEmailAndPassword(auth, email, password);
 
           const token = await getIdToken(userCredential.user, true);
-          const userResponse = await api.get("/auth/me", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const userProfile = await syncUserDoc(userCredential.user);
 
           set({
             token,
-            user: userResponse.data,
+            user: userProfile,
             isAuthenticated: true,
             loading: false,
           });
 
+          const pendingAudioConsent = localStorage.getItem("pending_audio_consent");
+          if (pendingAudioConsent === "true") {
+            await get().updateAudioConsent(true);
+          }
+          localStorage.removeItem("pending_audio_consent");
+
           return {
             success: true,
             token,
-            user: userResponse.data,
+            user: userProfile,
           };
         } catch (error) {
           const errorMessage =
@@ -99,7 +178,6 @@ export const useAuthStore = create(
         try {
           await signOut(auth);
           set({ user: null, token: null, isAuthenticated: false });
-          delete api.defaults.headers.common["Authorization"];
         } catch (error) {
           console.error("Logout error:", error);
         }
@@ -110,10 +188,8 @@ export const useAuthStore = create(
         if (currentUser) {
           try {
             const token = await getIdToken(currentUser, true);
-            const response = await api.get("/auth/me", {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            set({ token, user: response.data, isAuthenticated: true });
+            const userProfile = await syncUserDoc(currentUser);
+            set({ token, user: userProfile, isAuthenticated: true });
             return true;
           } catch (error) {
             set({ token: null, user: null, isAuthenticated: false });
@@ -125,12 +201,34 @@ export const useAuthStore = create(
 
       updateAudioConsent: async (consent) => {
         try {
-          await api.post("/auth/consent/audio", null, {
-            params: { consent },
+          const currentUser = auth.currentUser;
+          if (!currentUser) {
+            throw new Error("No authenticated user");
+          }
+
+          const stateUser = get().user;
+          const now = nowIso();
+          await setDoc(
+            doc(db, "users", currentUser.uid),
+            {
+              email: stateUser?.email || currentUser.email || "",
+              email_verified:
+                stateUser?.email_verified ?? currentUser.emailVerified ?? true,
+              audio_consent: Boolean(consent),
+              created_at:
+                stateUser?.created_at || currentUser.metadata?.creationTime || now,
+              last_login: now,
+              updated_at: now,
+            },
+            { merge: true },
+          );
+
+          set((state) => {
+            if (!state.user) return state;
+            return {
+              user: { ...state.user, audio_consent: Boolean(consent), last_login: now },
+            };
           });
-          set((state) => ({
-            user: { ...state.user, audio_consent: consent },
-          }));
         } catch (error) {
           console.error("Failed to update audio consent:", error);
           throw error;
