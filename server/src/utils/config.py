@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     STT_AWS_LANGUAGE_CODE: str = "en-US"
     STT_AWS_JOB_TIMEOUT_SEC: int = 180
     STT_AWS_POLL_INTERVAL_SEC: int = 3
+    
+    # Whisper Local Model (for offline STT)
+    WHISPER_MODEL_SIZE: str = "base"  # tiny, base, small, medium, large
+    WHISPER_DEVICE: str = "cpu"  # cpu or cuda for GPU
 
     # AWS Transcribe
     AWS_TRANSCRIBE_S3_BUCKET: str = ""

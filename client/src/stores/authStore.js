@@ -11,6 +11,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "../config/firebase";
 
 const nowIso = () => new Date().toISOString();
+const apiBaseUrl = import.meta.env.VITE_API_URL || "/api/v1";
 
 const toIsoString = (value) => {
   if (!value) return null;
@@ -34,8 +35,7 @@ const syncUserDoc = async (firebaseUser) => {
     const mergedUser = {
       id: firebaseUser.uid,
       email: data.email || firebaseUser.email || "",
-      email_verified:
-        data.email_verified ?? firebaseUser.emailVerified ?? true,
+      email_verified: data.email_verified ?? firebaseUser.emailVerified ?? true,
       audio_consent: Boolean(data.audio_consent),
       created_at: createdAt,
       last_login: now,
@@ -86,6 +86,29 @@ const syncUserDoc = async (firebaseUser) => {
   return newUser;
 };
 
+const syncAudioConsentToBackend = async ({ consent, token, userId, email }) => {
+  if (!userId) return;
+
+  const params = new URLSearchParams({ consent: String(Boolean(consent)) });
+  const headers = {
+    "X-User-Id": userId,
+    "X-User-Email": email || "",
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const response = await fetch(
+    `${apiBaseUrl}/auth/consent/audio?${params.toString()}`,
+    {
+      method: "POST",
+      headers,
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Consent sync failed with status ${response.status}`);
+  }
+};
+
 export const useAuthStore = create(
   persist(
     (set, get) => ({
@@ -98,7 +121,12 @@ export const useAuthStore = create(
       initAuthListener: async () => {
         onAuthStateChanged(auth, async (firebaseUser) => {
           if (!firebaseUser) {
-            set({ user: null, token: null, isAuthenticated: false, loading: false });
+            set({
+              user: null,
+              token: null,
+              isAuthenticated: false,
+              loading: false,
+            });
             return;
           }
 
@@ -113,9 +141,25 @@ export const useAuthStore = create(
               loading: false,
               error: null,
             });
+
+            try {
+              await syncAudioConsentToBackend({
+                consent: Boolean(userProfile.audio_consent),
+                token,
+                userId: userProfile.id,
+                email: userProfile.email,
+              });
+            } catch (error) {
+              console.warn("Backend audio consent sync failed:", error);
+            }
           } catch (error) {
             console.error("Failed to fetch user profile:", error);
-            set({ user: null, token: null, isAuthenticated: false, loading: false });
+            set({
+              user: null,
+              token: null,
+              isAuthenticated: false,
+              loading: false,
+            });
           }
         });
       },
@@ -124,10 +168,19 @@ export const useAuthStore = create(
         set({ loading: true, error: null });
         try {
           await createUserWithEmailAndPassword(auth, email, password);
-          localStorage.setItem("pending_audio_consent", audioConsent ? "true" : "false");
+          localStorage.setItem(
+            "pending_audio_consent",
+            audioConsent ? "true" : "false",
+          );
           await signOut(auth);
 
-          set({ loading: false });
+          // Explicitly clear auth state after sign out
+          set({
+            loading: false,
+            user: null,
+            token: null,
+            isAuthenticated: false,
+          });
           return {
             success: true,
             message: "Account created successfully. You can log in now.",
@@ -143,7 +196,11 @@ export const useAuthStore = create(
       login: async (email, password) => {
         set({ loading: true, error: null });
         try {
-          const userCredential = await signInWithEmailAndPassword(auth, email, password);
+          const userCredential = await signInWithEmailAndPassword(
+            auth,
+            email,
+            password,
+          );
 
           const token = await getIdToken(userCredential.user, true);
           const userProfile = await syncUserDoc(userCredential.user);
@@ -155,7 +212,20 @@ export const useAuthStore = create(
             loading: false,
           });
 
-          const pendingAudioConsent = localStorage.getItem("pending_audio_consent");
+          try {
+            await syncAudioConsentToBackend({
+              consent: Boolean(userProfile.audio_consent),
+              token,
+              userId: userProfile.id,
+              email: userProfile.email,
+            });
+          } catch (error) {
+            console.warn("Backend audio consent sync failed:", error);
+          }
+
+          const pendingAudioConsent = localStorage.getItem(
+            "pending_audio_consent",
+          );
           if (pendingAudioConsent === "true") {
             await get().updateAudioConsent(true);
           }
@@ -216,7 +286,9 @@ export const useAuthStore = create(
                 stateUser?.email_verified ?? currentUser.emailVerified ?? true,
               audio_consent: Boolean(consent),
               created_at:
-                stateUser?.created_at || currentUser.metadata?.creationTime || now,
+                stateUser?.created_at ||
+                currentUser.metadata?.creationTime ||
+                now,
               last_login: now,
               updated_at: now,
             },
@@ -226,8 +298,20 @@ export const useAuthStore = create(
           set((state) => {
             if (!state.user) return state;
             return {
-              user: { ...state.user, audio_consent: Boolean(consent), last_login: now },
+              user: {
+                ...state.user,
+                audio_consent: Boolean(consent),
+                last_login: now,
+              },
             };
+          });
+
+          const state = get();
+          await syncAudioConsentToBackend({
+            consent: Boolean(consent),
+            token: state.token,
+            userId: state.user?.id || currentUser.uid,
+            email: state.user?.email || currentUser.email || "",
           });
         } catch (error) {
           console.error("Failed to update audio consent:", error);
