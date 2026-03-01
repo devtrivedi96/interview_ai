@@ -1,7 +1,17 @@
-import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { sessionService } from '../services/sessionService'
-import { Mic, Square, Loader, Volume2, ChevronRight, CheckCircle2, AlertCircle, ArrowRight, Sparkles } from 'lucide-react'
+import { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { sessionService } from "../services/sessionService";
+import {
+  Mic,
+  Square,
+  Loader,
+  Volume2,
+  ChevronRight,
+  CheckCircle2,
+  AlertCircle,
+  ArrowRight,
+  Sparkles,
+} from "lucide-react";
 
 const STYLE = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
@@ -450,146 +460,206 @@ const STYLE = `
     margin-top: 8px;
   }
   .iv-strategy strong { color: var(--text-2); }
-`
+`;
 
 export default function Interview() {
-  const { sessionId } = useParams()
-  const navigate = useNavigate()
+  const { sessionId } = useParams();
+  const navigate = useNavigate();
 
-  const [question, setQuestion] = useState(null)
-  const [isRecording, setIsRecording] = useState(false)
-  const [transcript, setTranscript] = useState('')
-  const [evaluation, setEvaluation] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [isSpeakingQuestion, setIsSpeakingQuestion] = useState(false)
-  const [autoFlow, setAutoFlow] = useState(true)
-  const [handsFree, setHandsFree] = useState(true)
-  const [autoNextCountdown, setAutoNextCountdown] = useState(0)
-  const [questionIndex, setQuestionIndex] = useState(1)
+  const [question, setQuestion] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const [evaluation, setEvaluation] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [isSpeakingQuestion, setIsSpeakingQuestion] = useState(false);
+  const [autoFlow, setAutoFlow] = useState(true);
+  const [handsFree, setHandsFree] = useState(true);
+  const [autoNextCountdown, setAutoNextCountdown] = useState(0);
+  const [questionIndex, setQuestionIndex] = useState(1);
 
-  const mediaRecorderRef = useRef(null)
-  const audioChunksRef = useRef([])
-  const startTimeRef = useRef(null)
-  const utteranceRef = useRef(null)
-  const autoNextTimerRef = useRef(null)
-
-  useEffect(() => { loadNextQuestion() }, [])
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const startTimeRef = useRef(null);
+  const utteranceRef = useRef(null);
+  const autoNextTimerRef = useRef(null);
 
   useEffect(() => {
-    if (question?.question_text) speakQuestion(question.question_text)
-    return () => { window.speechSynthesis.cancel(); utteranceRef.current = null }
-  }, [question?.id])
+    loadNextQuestion();
+  }, []);
 
   useEffect(() => {
-    if (!evaluation || !autoFlow) return
-    setAutoNextCountdown(4)
+    if (question?.question_text) speakQuestion(question.question_text);
+    return () => {
+      window.speechSynthesis.cancel();
+      utteranceRef.current = null;
+    };
+  }, [question?.id]);
+
+  useEffect(() => {
+    if (!evaluation || !autoFlow) return;
+    setAutoNextCountdown(4);
     autoNextTimerRef.current = setInterval(() => {
       setAutoNextCountdown((prev) => {
-        if (prev <= 1) { clearInterval(autoNextTimerRef.current); loadNextQuestion(); return 0 }
-        return prev - 1
-      })
-    }, 1000)
-    return () => { if (autoNextTimerRef.current) clearInterval(autoNextTimerRef.current) }
-  }, [evaluation, autoFlow])
+        if (prev <= 1) {
+          clearInterval(autoNextTimerRef.current);
+          loadNextQuestion();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (autoNextTimerRef.current) clearInterval(autoNextTimerRef.current);
+    };
+  }, [evaluation, autoFlow]);
 
   const speakQuestion = (text) => {
-    if (!('speechSynthesis' in window) || !text) return
-    window.speechSynthesis.cancel()
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.rate = 0.95; utterance.pitch = 1; utterance.volume = 1
-    utterance.onstart = () => setIsSpeakingQuestion(true)
-    utterance.onend = () => { setIsSpeakingQuestion(false); if (handsFree && !evaluation && !isRecording) startRecording() }
-    utterance.onerror = () => setIsSpeakingQuestion(false)
-    utteranceRef.current = utterance
-    window.speechSynthesis.speak(utterance)
-  }
+    if (!("speechSynthesis" in window) || !text) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    utterance.onstart = () => setIsSpeakingQuestion(true);
+    utterance.onend = () => {
+      setIsSpeakingQuestion(false);
+      if (handsFree && !evaluation && !isRecording) startRecording();
+    };
+    utterance.onerror = () => setIsSpeakingQuestion(false);
+    utteranceRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+  };
 
   const loadNextQuestion = async () => {
-    if (autoNextTimerRef.current) { clearInterval(autoNextTimerRef.current); autoNextTimerRef.current = null }
-    setAutoNextCountdown(0); setLoading(true); setError(''); setEvaluation(null); setTranscript('')
+    if (autoNextTimerRef.current) {
+      clearInterval(autoNextTimerRef.current);
+      autoNextTimerRef.current = null;
+    }
+    setAutoNextCountdown(0);
+    setLoading(true);
+    setError("");
+    setEvaluation(null);
+    setTranscript("");
     try {
-      const data = await sessionService.getNextQuestion(sessionId)
-      setQuestion(data)
-      setQuestionIndex((prev) => prev + (question ? 1 : 0))
+      const data = await sessionService.getNextQuestion(sessionId);
+      setQuestion(data);
+      setQuestionIndex((prev) => prev + (question ? 1 : 0));
     } catch (err) {
-      if (err.response?.status === 400) navigate(`/session/${sessionId}/summary`)
-      else setError('Failed to load question. Please try again.')
-    } finally { setLoading(false) }
-  }
+      if (err.response?.status === 400)
+        navigate(`/session/${sessionId}/summary`);
+      else setError("Failed to load question. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const startRecording = async () => {
-    if (!question?.id) { setError('Question is not ready yet. Please wait a moment.'); return }
+    if (!question?.id) {
+      setError("Question is not ready yet. Please wait a moment.");
+      return;
+    }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
-      const questionIdAtRecordStart = question.id
-      mediaRecorderRef.current = mediaRecorder
-      audioChunksRef.current = []
-      startTimeRef.current = Date.now()
-      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      const questionIdAtRecordStart = question.id;
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      startTimeRef.current = Date.now();
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        const duration = (Date.now() - startTimeRef.current) / 1000
-        stream.getTracks().forEach(t => t.stop())
-        await submitAnswer(audioBlob, duration, questionIdAtRecordStart)
-      }
-      mediaRecorder.start()
-      setIsRecording(true)
-    } catch { alert('Please allow microphone access to record your answer.') }
-  }
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: "audio/webm",
+        });
+        const duration = (Date.now() - startTimeRef.current) / 1000;
+        stream.getTracks().forEach((t) => t.stop());
+        await submitAnswer(audioBlob, duration, questionIdAtRecordStart);
+      };
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch {
+      alert("Please allow microphone access to record your answer.");
+    }
+  };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) { mediaRecorderRef.current.stop(); setIsRecording(false) }
-  }
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
 
   const submitAnswer = async (audioBlob, duration, questionId) => {
-    setLoading(true); setError('')
+    setLoading(true);
+    setError("");
     try {
-      if (!questionId) throw new Error('Question ID missing')
-      const audioFile = new File([audioBlob], 'answer.webm', { type: 'audio/webm' })
-      const result = await sessionService.submitAnswer(sessionId, questionId, { audioFile, audioDuration: duration })
-      setEvaluation(result)
-      if (result.transcript) setTranscript(result.transcript)
-    } catch { setError('Failed to evaluate answer. Please try again.')
-    } finally { setLoading(false) }
-  }
+      if (!questionId) throw new Error("Question ID missing");
+      const audioFile = new File([audioBlob], "answer.webm", {
+        type: "audio/webm",
+      });
+      // Log file size and prevent empty upload
+      if (audioFile.size === 0) {
+        setError("Audio file is empty. Please record your answer again.");
+        alert("Audio file is empty. Please record your answer again.");
+        return;
+      }
+      console.log("Uploading audio file size:", audioFile.size, "bytes");
+      const result = await sessionService.submitAnswer(sessionId, questionId, {
+        audioFile,
+        audioDuration: duration,
+      });
+      setEvaluation(result);
+      if (result.transcript) setTranscript(result.transcript);
+    } catch {
+      setError("Failed to evaluate answer. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleComplete = async () => {
-    try { await sessionService.completeSession(sessionId) } catch {}
-    navigate(`/session/${sessionId}/summary`)
-  }
+    try {
+      await sessionService.completeSession(sessionId);
+    } catch {}
+    navigate(`/session/${sessionId}/summary`);
+  };
 
-  if (loading && !question) return (
-    <>
-      <style>{STYLE}</style>
-      <div className="iv-root">
-        <div className="iv-loading">
-          <div className="iv-loader-ring" />
-          <p className="iv-loader-text">Loading your question…</p>
+  if (loading && !question)
+    return (
+      <>
+        <style>{STYLE}</style>
+        <div className="iv-root">
+          <div className="iv-loading">
+            <div className="iv-loader-ring" />
+            <p className="iv-loader-text">Loading your question…</p>
+          </div>
         </div>
-      </div>
-    </>
-  )
+      </>
+    );
 
   return (
     <>
       <style>{STYLE}</style>
       <div className="iv-root">
-
         {/* Header */}
         {question && (
           <div className="iv-header">
-            <h1 className="iv-q-label">Question <span>#{questionIndex}</span></h1>
+            <h1 className="iv-q-label">
+              Question <span>#{questionIndex}</span>
+            </h1>
             <div className="iv-badges">
-              <span className="iv-badge">Difficulty {question.difficulty}/5</span>
+              <span className="iv-badge">
+                Difficulty {question.difficulty}/5
+              </span>
               <button
                 type="button"
-                className={`iv-replay-btn${isSpeakingQuestion ? ' speaking' : ''}`}
+                className={`iv-replay-btn${isSpeakingQuestion ? " speaking" : ""}`}
                 onClick={() => speakQuestion(question.question_text)}
               >
                 <Volume2 size={13} />
-                {isSpeakingQuestion ? 'Speaking…' : 'Replay'}
+                {isSpeakingQuestion ? "Speaking…" : "Replay"}
               </button>
             </div>
           </div>
@@ -606,13 +676,25 @@ export default function Interview() {
         {!evaluation && (
           <div className="iv-controls-bar">
             <label className="iv-toggle">
-              <input type="checkbox" checked={handsFree} onChange={(e) => setHandsFree(e.target.checked)} />
-              <span className="iv-toggle-track"><span className="iv-toggle-thumb" /></span>
+              <input
+                type="checkbox"
+                checked={handsFree}
+                onChange={(e) => setHandsFree(e.target.checked)}
+              />
+              <span className="iv-toggle-track">
+                <span className="iv-toggle-thumb" />
+              </span>
               Hands-free recording
             </label>
             <label className="iv-toggle">
-              <input type="checkbox" checked={autoFlow} onChange={(e) => setAutoFlow(e.target.checked)} />
-              <span className="iv-toggle-track"><span className="iv-toggle-thumb" /></span>
+              <input
+                type="checkbox"
+                checked={autoFlow}
+                onChange={(e) => setAutoFlow(e.target.checked)}
+              />
+              <span className="iv-toggle-track">
+                <span className="iv-toggle-thumb" />
+              </span>
               Auto-advance
             </label>
           </div>
@@ -623,11 +705,15 @@ export default function Interview() {
           <div className="iv-record-area">
             <button
               type="button"
-              className={`iv-record-btn ${isRecording ? 'recording' : 'idle'}`}
+              className={`iv-record-btn ${isRecording ? "recording" : "idle"}`}
               onClick={isRecording ? stopRecording : startRecording}
               disabled={loading || !question || isSpeakingQuestion}
             >
-              {isRecording ? <Square size={28} color="#fff" /> : <Mic size={28} color="#fff" />}
+              {isRecording ? (
+                <Square size={28} color="#fff" />
+              ) : (
+                <Mic size={28} color="#fff" />
+              )}
             </button>
 
             {isRecording && (
@@ -638,12 +724,17 @@ export default function Interview() {
             )}
             {!isRecording && !loading && (
               <div className="iv-record-status">
-                {isSpeakingQuestion ? 'Listening to question…' : 'Tap to start recording'}
+                {isSpeakingQuestion
+                  ? "Listening to question…"
+                  : "Tap to start recording"}
               </div>
             )}
             {loading && (
               <div className="iv-evaluating">
-                <div className="iv-loader-ring" style={{ width: 20, height: 20, borderWidth: 2 }} />
+                <div
+                  className="iv-loader-ring"
+                  style={{ width: 20, height: 20, borderWidth: 2 }}
+                />
                 Evaluating your answer…
               </div>
             )}
@@ -668,17 +759,21 @@ export default function Interview() {
                 {evaluation.composite_score.toFixed(1)}
                 <span className="iv-score-denom">/5</span>
               </div>
-              <div className="iv-confidence">Confidence: {(evaluation.eval_confidence * 100).toFixed(0)}%</div>
+              <div className="iv-confidence">
+                Confidence: {(evaluation.eval_confidence * 100).toFixed(0)}%
+              </div>
             </div>
 
             {/* Dimension scores */}
             <div className="iv-dims">
-              {Object.entries(evaluation.dimension_scores).map(([dim, score], i) => (
-                <div key={dim} className="iv-dim">
-                  <div className="iv-dim-score">{score.toFixed(1)}</div>
-                  <div className="iv-dim-label">D{i + 1}</div>
-                </div>
-              ))}
+              {Object.entries(evaluation.dimension_scores).map(
+                ([dim, score], i) => (
+                  <div key={dim} className="iv-dim">
+                    <div className="iv-dim-score">{score.toFixed(1)}</div>
+                    <div className="iv-dim-label">D{i + 1}</div>
+                  </div>
+                ),
+              )}
             </div>
 
             {/* Transcript */}
@@ -686,18 +781,23 @@ export default function Interview() {
               <div className="iv-transcript">
                 <div className="iv-transcript-label">What AI Heard</div>
                 <div className="iv-transcript-text">{transcript}</div>
-                {typeof evaluation.clarity_score === 'number' && (
+                {typeof evaluation.clarity_score === "number" && (
                   <div className="iv-clarity">
-                    Clarity: <strong>{evaluation.clarity_score.toFixed(2)}</strong>
+                    Clarity:{" "}
+                    <strong>{evaluation.clarity_score.toFixed(2)}</strong>
                     {!evaluation.clarity_ok && (
-                      <span className="iv-clarity-warn"> — try speaking slower for better scoring</span>
+                      <span className="iv-clarity-warn">
+                        {" "}
+                        — try speaking slower for better scoring
+                      </span>
                     )}
                   </div>
                 )}
                 {evaluation.next_question_strategy && (
                   <div className="iv-strategy">
                     <Sparkles size={12} />
-                    Next strategy: <strong>{evaluation.next_question_strategy}</strong>
+                    Next strategy:{" "}
+                    <strong>{evaluation.next_question_strategy}</strong>
                   </div>
                 )}
               </div>
@@ -712,7 +812,9 @@ export default function Interview() {
                 </div>
                 {evaluation.strengths.map((s, i) => (
                   <div key={i} className="iv-fb-item">
-                    <span className="iv-fb-icon green"><CheckCircle2 size={13} /></span>
+                    <span className="iv-fb-icon green">
+                      <CheckCircle2 size={13} />
+                    </span>
                     {s}
                   </div>
                 ))}
@@ -724,7 +826,9 @@ export default function Interview() {
                 </div>
                 {evaluation.improvements.map((s, i) => (
                   <div key={i} className="iv-fb-item">
-                    <span className="iv-fb-icon amber"><ArrowRight size={13} /></span>
+                    <span className="iv-fb-icon amber">
+                      <ArrowRight size={13} />
+                    </span>
                     {s}
                   </div>
                 ))}
@@ -734,10 +838,16 @@ export default function Interview() {
             {/* Actions */}
             <div className="iv-actions">
               <button className="iv-btn-primary" onClick={loadNextQuestion}>
-                {autoFlow && autoNextCountdown > 0
-                  ? <><span className="iv-countdown">{autoNextCountdown}</span> Next Question</>
-                  : <>Next Question <ChevronRight size={15} /></>
-                }
+                {autoFlow && autoNextCountdown > 0 ? (
+                  <>
+                    <span className="iv-countdown">{autoNextCountdown}</span>{" "}
+                    Next Question
+                  </>
+                ) : (
+                  <>
+                    Next Question <ChevronRight size={15} />
+                  </>
+                )}
               </button>
               <button className="iv-btn-secondary" onClick={handleComplete}>
                 Complete Session
@@ -747,5 +857,5 @@ export default function Interview() {
         )}
       </div>
     </>
-  )
+  );
 }

@@ -156,16 +156,22 @@ class STTService:
                 if status == "COMPLETED":
                     transcript_uri = job["TranscriptionJob"]["Transcript"]["TranscriptFileUri"]
                     import requests
-                    try:
-                        response = requests.get(transcript_uri)
-                        response.raise_for_status()
-                        transcript_json = response.json()
-                        transcript = transcript_json["results"]["transcripts"][0]["transcript"]
-                        logger.info(f"AWS Transcribe completed: {transcript[:100]}...")
-                        return transcript
-                    except Exception as fetch_exc:
-                        logger.error(f"Failed to fetch transcript from S3: {fetch_exc}")
-                        raise HTTPException(status_code=500, detail=f"Failed to fetch transcript from S3: {fetch_exc}")
+                    fetch_attempts = 3
+                    for fetch_try in range(fetch_attempts):
+                        try:
+                            logger.info(f"Fetching transcript (attempt {fetch_try+1}) from presigned URL: {transcript_uri}")
+                            response = requests.get(transcript_uri)
+                            logger.info(f"Transcript fetch HTTP status: {response.status_code}")
+                            response.raise_for_status()
+                            transcript_json = response.json()
+                            transcript = transcript_json["results"]["transcripts"][0]["transcript"]
+                            logger.info(f"AWS Transcribe completed: {transcript[:100]}...")
+                            return transcript
+                        except Exception as fetch_exc:
+                            logger.error(f"Failed to fetch transcript from S3 (attempt {fetch_try+1}): {fetch_exc}")
+                            if fetch_try == fetch_attempts - 1:
+                                raise HTTPException(status_code=500, detail=f"Failed to fetch transcript from S3 after {fetch_attempts} attempts: {fetch_exc}")
+                            time.sleep(2)
                 elif status == "FAILED":
                     logger.error(f"AWS Transcribe job failed: {job}")
                     raise HTTPException(status_code=500, detail="AWS Transcribe job failed")
