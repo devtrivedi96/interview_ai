@@ -169,7 +169,7 @@ class _InMemoryDB:
 
 
 def get_db():
-    """Return Firestore client; fallback to in-memory DB when unavailable."""
+    """Return Firestore client; fail fast when unavailable."""
     global _db_client
 
     if _db_client is not None:
@@ -194,6 +194,8 @@ def get_db():
         logger.info("Firestore client initialized successfully")
         return _db_client
     except Exception as e:
-        logger.warning(f"Firestore unavailable, using in-memory DB fallback: {e}")
-        _db_client = _InMemoryDB()
-        return _db_client
+        logger.error(f"Firestore initialization failed: {e}")
+        raise RuntimeError(
+            "Firestore is required but unavailable. "
+            "Configure Application Default Credentials or FIREBASE_CREDENTIALS_PATH."
+        ) from e

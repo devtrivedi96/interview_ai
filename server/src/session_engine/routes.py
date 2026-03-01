@@ -2,7 +2,7 @@
 Session management routes
 Handles interview session lifecycle
 """
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import Optional
 
@@ -171,7 +171,8 @@ async def get_next_question(
 async def submit_answer(
     session_id: str,
     question_id: str,
-    answer_data: AnswerSubmit,
+    transcript: Optional[str] = Form(None),
+    audio_duration_sec: Optional[float] = Form(None),
     audio_file: Optional[UploadFile] = File(None),
     current_user: User = Depends(require_audio_consent)
 ):
@@ -190,7 +191,13 @@ async def submit_answer(
     
     session = InterviewSession.from_dict(session_doc.id, session_doc.to_dict())
     if session.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"Not authorized for this session. "
+                f"session_user_id={session.user_id}, current_user_id={current_user.id}"
+            ),
+        )
     
     # Get question
     question_doc = db.collection(Collections.SESSION_QUESTIONS).document(question_id).get()
@@ -199,18 +206,22 @@ async def submit_answer(
     
     from src.db.models import SessionQuestion
     question = SessionQuestion.from_dict(question_doc.id, question_doc.to_dict())
+    if question.session_id != session_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Question does not belong to this session",
+        )
     
     # Get transcript
-    transcript = answer_data.transcript
     clarity_score = None
     
     if not transcript and audio_file:
         # Transcribe audio
         stt_service = STTService()
         transcript = await stt_service.transcribe(audio_file)
-        if answer_data.audio_duration_sec:
+        if audio_duration_sec:
             clarity_score = stt_service.calculate_clarity_score(
-                transcript, answer_data.audio_duration_sec
+                transcript, audio_duration_sec
             )
     
     if not transcript:
@@ -222,7 +233,7 @@ async def submit_answer(
     # Update question with transcript
     db.collection(Collections.SESSION_QUESTIONS).document(question_id).update({
         'transcript': transcript,
-        'audio_duration_sec': answer_data.audio_duration_sec,
+        'audio_duration_sec': audio_duration_sec,
         'clarity_score': clarity_score,
     })
     
