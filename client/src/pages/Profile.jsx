@@ -1,44 +1,80 @@
-import { useState, useEffect } from 'react'
-import { useAuthStore } from '../stores/authStore'
-import { useProfileStore } from '../stores/profileStore'
-import PreferencesModal from '../components/PreferencesModal'
-import { User, Edit2, ShieldCheck, Mic, CalendarDays, CheckCircle2, XCircle } from 'lucide-react'
+import { useState, useEffect } from "react";
+import { useAuthStore } from "../stores/authStore";
+import { useProfileStore } from "../stores/profileStore";
+import PreferencesModal from "../components/PreferencesModal";
+import ThemeToggle from "../components/ThemeToggle";
+import {
+  User,
+  Edit2,
+  ShieldCheck,
+  Mic,
+  CalendarDays,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 
 const STYLE = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
 
   :root {
+    --bg:          #0a0a0f;
+    --surface:     #16161f;
+    --surface-2:   #1e1e2b;
+    --border:      #2a2a3d;
+    --text-1:      #f0f0f5;
+    --text-2:      #b0b0c0;
+    --text-3:      #70707e;
+    --accent:      #ff6b35;
+    --accent-glow: rgba(255, 107, 53, 0.25);
+    --accent-soft: #2a1c16;
+    --green:       #10b981;
+    --green-glow:  rgba(16, 185, 129, 0.2);
+    --blue:        #3b82f6;
+    --blue-soft:   #0f1d35;
+    --purple:      #a855f7;
+    --purple-glow: rgba(168, 85, 247, 0.2);
+    --shadow-sm:   0 2px 8px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.2);
+    --shadow-md:   0 8px 24px rgba(0,0,0,.4), 0 4px 12px rgba(0,0,0,.3);
+    --shadow-glow: 0 0 40px var(--accent-glow);
+    --radius:      16px;
+    --radius-sm:   10px;
+    --font-display: 'Syne', sans-serif;
+    --font-body:    'DM Sans', sans-serif;
+  }
+
+  [data-theme="light"] {
     --bg:          #f7f5f2;
     --surface:     #ffffff;
     --surface-2:   #f0ede8;
-    --border:      #e8e3db;
+    --border:      #d8d3cb;
     --text-1:      #1a1714;
     --text-2:      #6b6560;
     --text-3:      #a09890;
-    --accent:      #d4622a;
+    --accent:      #ff6b35;
+    --accent-glow: rgba(255, 107, 53, 0.15);
     --accent-soft: #fde8dc;
-    --green:       #22a67a;
-    --green-soft:  #d1fae5;
-    --blue:        #2a6dd4;
+    --green:       #10b981;
+    --green-glow:  rgba(16, 185, 129, 0.15);
+    --blue:        #3b82f6;
     --blue-soft:   #dbeafe;
-    --purple:      #9333ea;
-    --purple-soft: #f3e8ff;
+    --purple:      #a855f7;
+    --purple-glow: rgba(168, 85, 247, 0.15);
     --shadow-sm:   0 1px 3px rgba(26,23,20,.06), 0 1px 2px rgba(26,23,20,.04);
     --shadow-md:   0 4px 16px rgba(26,23,20,.08), 0 2px 6px rgba(26,23,20,.04);
-    --radius:      14px;
-    --radius-sm:   8px;
-    --font-display: 'Syne', sans-serif;
-    --font-body:    'DM Sans', sans-serif;
+    --shadow-glow: 0 0 20px var(--accent-glow);
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   .pr-root {
-    max-width: 860px;
+    max-width: 920px;
     margin: 0 auto;
     padding: 36px 24px 80px;
     font-family: var(--font-body);
     color: var(--text-1);
+    background: var(--bg);
+    min-height: 100vh;
+    transition: background 0.3s ease, color 0.3s ease;
   }
 
   /* Loading */
@@ -56,7 +92,14 @@ const STYLE = `
   @keyframes spin { to { transform: rotate(360deg); } }
 
   /* Header */
-  .pr-header { margin-bottom: 32px; }
+  .pr-header { 
+    margin-bottom: 32px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
   .pr-title {
     font-family: var(--font-display);
     font-size: clamp(2rem, 4vw, 2.8rem);
@@ -281,65 +324,96 @@ const STYLE = `
   .pr-root > *:nth-child(1) { animation-delay: .05s }
   .pr-root > *:nth-child(2) { animation-delay: .10s }
   .pr-root > *:nth-child(3) { animation-delay: .15s }
-`
+`;
 
 export default function Profile() {
-  const { user, updateAudioConsent } = useAuthStore()
-  const { preferences, preferencesExists, fetchPreferences } = useProfileStore()
-  const [showModal, setShowModal] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [consentValue, setConsentValue] = useState(false)
-  const [savingConsent, setSavingConsent] = useState(false)
-  const [consentMessage, setConsentMessage] = useState('')
-  const [consentOk, setConsentOk] = useState(true)
+  const { user, updateAudioConsent } = useAuthStore();
+  const { preferences, preferencesExists, fetchPreferences } =
+    useProfileStore();
+  const [showModal, setShowModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [consentValue, setConsentValue] = useState(false);
+  const [savingConsent, setSavingConsent] = useState(false);
+  const [consentMessage, setConsentMessage] = useState("");
+  const [consentOk, setConsentOk] = useState(true);
 
-  useEffect(() => { loadPreferences() }, [])
-  useEffect(() => { setConsentValue(Boolean(user?.audio_consent)) }, [user?.audio_consent])
+  useEffect(() => {
+    loadPreferences();
+  }, []);
+  useEffect(() => {
+    setConsentValue(Boolean(user?.audio_consent));
+  }, [user?.audio_consent]);
 
   const loadPreferences = async () => {
-    try { await fetchPreferences() }
-    catch (err) { console.error(err) }
-    finally { setLoading(false) }
-  }
+    try {
+      await fetchPreferences();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleConsentSave = async () => {
-    setSavingConsent(true); setConsentMessage('')
+    setSavingConsent(true);
+    setConsentMessage("");
     try {
-      await updateAudioConsent(consentValue)
-      setConsentMessage('Audio consent updated successfully.')
-      setConsentOk(true)
+      await updateAudioConsent(consentValue);
+      setConsentMessage("Audio consent updated successfully.");
+      setConsentOk(true);
     } catch {
-      setConsentMessage('Failed to update consent. Please try again.')
-      setConsentOk(false)
-    } finally { setSavingConsent(false) }
-  }
+      setConsentMessage("Failed to update consent. Please try again.");
+      setConsentOk(false);
+    } finally {
+      setSavingConsent(false);
+    }
+  };
 
-  const initial = user?.email?.[0]?.toUpperCase() || 'U'
+  const initial = user?.email?.[0]?.toUpperCase() || "U";
   const joinDate = user?.created_at
-    ? new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-    : null
+    ? new Date(user.created_at).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    : null;
 
-  if (loading) return (
-    <>
-      <style>{STYLE}</style>
-      <div className="pr-root">
-        <div className="pr-loading">
-          <div className="pr-loader" />
-          <p style={{ fontSize: 14, color: 'var(--text-3)', fontFamily: 'var(--font-body)' }}>Loading profile…</p>
+  if (loading)
+    return (
+      <>
+        <style>{STYLE}</style>
+        <div className="pr-root">
+          <div className="pr-loading">
+            <div className="pr-loader" />
+            <p
+              style={{
+                fontSize: 14,
+                color: "var(--text-3)",
+                fontFamily: "var(--font-body)",
+              }}
+            >
+              Loading profile…
+            </p>
+          </div>
         </div>
-      </div>
-    </>
-  )
+      </>
+    );
 
   return (
     <>
       <style>{STYLE}</style>
       <div className="pr-root">
-
         {/* Header */}
         <div className="pr-header">
-          <h1 className="pr-title">Profile<span>.</span></h1>
-          <p className="pr-subtitle">Manage your account and interview preferences</p>
+          <div>
+            <h1 className="pr-title">
+              Profile<span>.</span>
+            </h1>
+            <p className="pr-subtitle">
+              Manage your account and interview preferences
+            </p>
+          </div>
+          <ThemeToggle />
         </div>
 
         {/* User card */}
@@ -348,7 +422,9 @@ export default function Profile() {
           <div className="pr-user-hero">
             <div className="pr-avatar">{initial}</div>
             <div>
-              <div className="pr-user-email">{user?.email || 'user@example.com'}</div>
+              <div className="pr-user-email">
+                {user?.email || "user@example.com"}
+              </div>
               {joinDate && (
                 <div className="pr-user-since">
                   <CalendarDays size={12} />
@@ -369,11 +445,18 @@ export default function Profile() {
             </div>
             <div className="pr-meta-item">
               <div className="pr-meta-label">Audio Consent</div>
-              <div className={`pr-meta-value ${user?.audio_consent ? 'green' : 'muted'}`}>
-                {user?.audio_consent
-                  ? <><CheckCircle2 size={14} /> Granted</>
-                  : <><XCircle size={14} /> Not granted</>
-                }
+              <div
+                className={`pr-meta-value ${user?.audio_consent ? "green" : "muted"}`}
+              >
+                {user?.audio_consent ? (
+                  <>
+                    <CheckCircle2 size={14} /> Granted
+                  </>
+                ) : (
+                  <>
+                    <XCircle size={14} /> Not granted
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -381,25 +464,53 @@ export default function Profile() {
           {/* Consent toggle */}
           <div className="pr-consent-panel">
             <div className="pr-consent-label">
-              <Mic size={13} style={{ display: 'inline', marginRight: 6, color: 'var(--accent)', verticalAlign: 'middle' }} />
+              <Mic
+                size={13}
+                style={{
+                  display: "inline",
+                  marginRight: 6,
+                  color: "var(--accent)",
+                  verticalAlign: "middle",
+                }}
+              />
               Allow audio recording for interview answers?
             </div>
             <div className="pr-consent-opts">
               <label>
-                <input className="pr-radio" type="radio" name="audio-consent" checked={consentValue === true} onChange={() => setConsentValue(true)} />
-                <span className="pr-radio-pill"><CheckCircle2 size={13} /> Yes</span>
+                <input
+                  className="pr-radio"
+                  type="radio"
+                  name="audio-consent"
+                  checked={consentValue === true}
+                  onChange={() => setConsentValue(true)}
+                />
+                <span className="pr-radio-pill">
+                  <CheckCircle2 size={13} /> Yes
+                </span>
               </label>
               <label>
-                <input className="pr-radio" type="radio" name="audio-consent" checked={consentValue === false} onChange={() => setConsentValue(false)} />
-                <span className="pr-radio-pill"><XCircle size={13} /> No</span>
+                <input
+                  className="pr-radio"
+                  type="radio"
+                  name="audio-consent"
+                  checked={consentValue === false}
+                  onChange={() => setConsentValue(false)}
+                />
+                <span className="pr-radio-pill">
+                  <XCircle size={13} /> No
+                </span>
               </label>
-              <button className="pr-save-btn" onClick={handleConsentSave} disabled={savingConsent}>
+              <button
+                className="pr-save-btn"
+                onClick={handleConsentSave}
+                disabled={savingConsent}
+              >
                 <ShieldCheck size={14} />
-                {savingConsent ? 'Saving…' : 'Save Consent'}
+                {savingConsent ? "Saving…" : "Save Consent"}
               </button>
             </div>
             {consentMessage && (
-              <div className={`pr-consent-msg ${consentOk ? 'ok' : 'err'}`}>
+              <div className={`pr-consent-msg ${consentOk ? "ok" : "err"}`}>
                 {consentOk ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
                 {consentMessage}
               </div>
@@ -415,7 +526,10 @@ export default function Profile() {
               Interview Preferences
             </span>
             {preferencesExists && (
-              <button className="pr-edit-btn" onClick={() => setShowModal(true)}>
+              <button
+                className="pr-edit-btn"
+                onClick={() => setShowModal(true)}
+              >
                 <Edit2 size={13} />
                 Edit Preferences
               </button>
@@ -427,7 +541,11 @@ export default function Profile() {
               <div className="pr-pref-section">
                 <div className="pr-pref-label">Tech Stack</div>
                 <div className="pr-tags">
-                  {preferences.tech_stack?.map(t => <span key={t} className="pr-tag default">{t}</span>)}
+                  {preferences.tech_stack?.map((t) => (
+                    <span key={t} className="pr-tag default">
+                      {t}
+                    </span>
+                  ))}
                 </div>
               </div>
 
@@ -436,20 +554,35 @@ export default function Profile() {
               <div className="pr-pref-section">
                 <div className="pr-pref-label">Preferred Roles</div>
                 <div className="pr-tags">
-                  {preferences.preferred_roles?.map(r => <span key={r} className="pr-tag blue">{r}</span>)}
+                  {preferences.preferred_roles?.map((r) => (
+                    <span key={r} className="pr-tag blue">
+                      {r}
+                    </span>
+                  ))}
                 </div>
               </div>
 
               <hr className="pr-divider" />
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 16,
+                  marginBottom: 18,
+                }}
+              >
                 <div className="pr-pref-section" style={{ marginBottom: 0 }}>
                   <div className="pr-pref-label">Experience Level</div>
-                  <div className="pr-pref-value">{preferences.experience_level || '—'}</div>
+                  <div className="pr-pref-value">
+                    {preferences.experience_level || "—"}
+                  </div>
                 </div>
                 <div className="pr-pref-section" style={{ marginBottom: 0 }}>
                   <div className="pr-pref-label">Target Company</div>
-                  <div className="pr-pref-value">{preferences.target_company_type?.replace('_', ' ') || '—'}</div>
+                  <div className="pr-pref-value">
+                    {preferences.target_company_type?.replace("_", " ") || "—"}
+                  </div>
                 </div>
               </div>
 
@@ -458,21 +591,30 @@ export default function Profile() {
               <div className="pr-pref-section">
                 <div className="pr-pref-label">Preferred Interview Modes</div>
                 <div className="pr-tags">
-                  {preferences.preferred_interview_modes?.map(m => <span key={m} className="pr-tag accent">{m}</span>)}
+                  {preferences.preferred_interview_modes?.map((m) => (
+                    <span key={m} className="pr-tag accent">
+                      {m}
+                    </span>
+                  ))}
                 </div>
               </div>
 
               {preferences.updated_at && (
                 <div className="pr-updated">
-                  Last updated: {new Date(preferences.updated_at).toLocaleDateString()}
+                  Last updated:{" "}
+                  {new Date(preferences.updated_at).toLocaleDateString()}
                 </div>
               )}
             </>
           ) : (
             <div className="pr-empty">
-              <div className="pr-empty-icon"><User size={22} /></div>
+              <div className="pr-empty-icon">
+                <User size={22} />
+              </div>
               <div className="pr-empty-title">No preferences set yet</div>
-              <div className="pr-empty-sub">Tell us your goals so we can tailor your interview experience.</div>
+              <div className="pr-empty-sub">
+                Tell us your goals so we can tailor your interview experience.
+              </div>
               <button className="pr-cta-btn" onClick={() => setShowModal(true)}>
                 <Edit2 size={14} />
                 Set Preferences Now
@@ -480,7 +622,6 @@ export default function Profile() {
             </div>
           )}
         </div>
-
       </div>
 
       <PreferencesModal
@@ -489,5 +630,5 @@ export default function Profile() {
         initialData={preferences}
       />
     </>
-  )
+  );
 }

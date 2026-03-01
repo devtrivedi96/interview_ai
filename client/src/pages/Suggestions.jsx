@@ -1,11 +1,34 @@
-import { useEffect, useState } from 'react'
-import { analyticsService } from '../services/analyticsService'
-import { Lightbulb, Target, ArrowRight } from 'lucide-react'
+import { useEffect, useState } from "react";
+import { analyticsService } from "../services/analyticsService";
+import { Lightbulb, Target, ArrowRight } from "lucide-react";
+import ThemeToggle from "../components/ThemeToggle";
 
 const STYLE = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
 
   :root {
+    --bg:          #0a0a0f;
+    --surface:     #1a1a24;
+    --surface-2:   #252533;
+    --border:      #3a3a4a;
+    --text-1:      #f0f0f3;
+    --text-2:      #a8a8b3;
+    --text-3:      #6a6a7a;
+    --accent:      #ff6b35;
+    --accent-soft: rgba(255, 107, 53, 0.15);
+    --purple:      #a855f7;
+    --purple-soft: rgba(168, 85, 247, 0.15);
+    --blue:        #3b82f6;
+    --blue-soft:   rgba(59, 130, 246, 0.15);
+    --shadow-sm:   0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-md:   0 4px 16px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.2);
+    --radius:      14px;
+    --radius-sm:   10px;
+    --font-display: 'Syne', sans-serif;
+    --font-body:    'DM Sans', sans-serif;
+  }
+
+  [data-theme="light"] {
     --bg:          #f7f5f2;
     --surface:     #ffffff;
     --surface-2:   #f0ede8;
@@ -13,27 +36,42 @@ const STYLE = `
     --text-1:      #1a1714;
     --text-2:      #6b6560;
     --text-3:      #a09890;
-    --accent:      #d4622a;
     --accent-soft: #fde8dc;
+    --purple-soft: rgba(168, 85, 247, 0.1);
+    --blue-soft:   rgba(59, 130, 246, 0.1);
     --shadow-sm:   0 1px 3px rgba(26,23,20,.06), 0 1px 2px rgba(26,23,20,.04);
     --shadow-md:   0 4px 16px rgba(26,23,20,.08), 0 2px 6px rgba(26,23,20,.04);
-    --radius:      14px;
-    --radius-sm:   10px;
-    --font-display: 'Syne', sans-serif;
-    --font-body:    'DM Sans', sans-serif;
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   .sg-root {
     max-width: 760px;
+    margin: 0 auto;
     padding: 36px 24px 80px;
     font-family: var(--font-body);
     color: var(--text-1);
+    background: var(--bg);
+    min-height: 100vh;
+    transition: background 0.3s ease, color 0.3s ease;
+    position: relative;
   }
 
   /* Header */
-  .sg-header { margin-bottom: 32px; }
+  .sg-header { 
+    margin-bottom: 32px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+
+  .theme-toggle-container {
+    position: absolute;
+    top: 36px;
+    right: 24px;
+  }
   .sg-title {
     font-family: var(--font-display);
     font-size: clamp(2rem, 4vw, 2.8rem);
@@ -156,63 +194,76 @@ const STYLE = `
     display: flex; align-items: flex-start; gap: 8px;
   }
   .sg-footer-note svg { color: var(--accent); flex-shrink: 0; margin-top: 1px; }
-`
+`;
 
 const DEFAULTS = [
-  'Structure answers with clear beginning, middle, and end.',
-  'State trade-offs explicitly when giving technical decisions.',
-  'Quantify impact using metrics in behavioral responses.',
-]
+  "Structure answers with clear beginning, middle, and end.",
+  "State trade-offs explicitly when giving technical decisions.",
+  "Quantify impact using metrics in behavioral responses.",
+];
 
 const FALLBACKS = [
-  'Practice 3 mock questions daily with a 2-minute answer limit.',
-  'Record answers and review clarity and pacing.',
-  'Revise one topic deeply before switching domains.',
-]
+  "Practice 3 mock questions daily with a 2-minute answer limit.",
+  "Record answers and review clarity and pacing.",
+  "Revise one topic deeply before switching domains.",
+];
 
 export default function Suggestions() {
-  const [loading, setLoading] = useState(true)
-  const [focusAreas, setFocusAreas] = useState([])
-  const [isAI, setIsAI] = useState(false)
+  const [loading, setLoading] = useState(true);
+  const [focusAreas, setFocusAreas] = useState([]);
+  const [isAI, setIsAI] = useState(false);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const insights = await analyticsService.getInsights(30)
-        const dynamic = insights?.recommended_focus || []
+        const insights = await analyticsService.getInsights(30);
+        const dynamic = insights?.recommended_focus || [];
         if (dynamic.length) {
-          setFocusAreas(dynamic)
-          setIsAI(true)
+          setFocusAreas(dynamic);
+          setIsAI(true);
         } else {
-          setFocusAreas(DEFAULTS)
+          setFocusAreas(DEFAULTS);
         }
       } catch {
-        setFocusAreas(FALLBACKS)
+        setFocusAreas(FALLBACKS);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
-    load()
-  }, [])
+    };
+    load();
+  }, []);
 
   return (
     <>
       <style>{STYLE}</style>
       <div className="sg-root">
+        <div className="theme-toggle-container">
+          <ThemeToggle />
+        </div>
 
         {/* Header */}
         <div className="sg-header">
-          <h1 className="sg-title">Suggestions<span>.</span></h1>
-          <p className="sg-subtitle">
-            {isAI ? 'AI-powered recommendations based on your recent sessions.' : 'Curated tips to sharpen your interview performance.'}
-          </p>
+          <div>
+            <h1 className="sg-title">
+              Suggestions<span>.</span>
+            </h1>
+            <p className="sg-subtitle">
+              {isAI
+                ? "AI-powered recommendations based on your recent sessions."
+                : "Curated tips to sharpen your interview performance."}
+            </p>
+          </div>
         </div>
 
         <div className="sg-card">
           <div className="sg-card-head">
             <Lightbulb size={15} />
             <span className="sg-card-title">Focus Areas</span>
-            {isAI && <span className="sg-source"><Target size={10} /> AI-powered</span>}
+            {isAI && (
+              <span className="sg-source">
+                <Target size={10} /> AI-powered
+              </span>
+            )}
           </div>
 
           {loading ? (
@@ -237,13 +288,11 @@ export default function Suggestions() {
           <div className="sg-footer-note">
             <ArrowRight size={13} />
             {isAI
-              ? 'These suggestions are generated from your last 30 days of sessions. Complete more interviews to refine them.'
-              : 'Start completing interviews to get personalized AI-powered recommendations tailored to your performance.'
-            }
+              ? "These suggestions are generated from your last 30 days of sessions. Complete more interviews to refine them."
+              : "Start completing interviews to get personalized AI-powered recommendations tailored to your performance."}
           </div>
         )}
-
       </div>
     </>
-  )
+  );
 }

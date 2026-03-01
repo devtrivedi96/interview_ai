@@ -1,8 +1,16 @@
 import { Outlet, Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
 import {
-  BarChart3, BookOpen, LayoutDashboard, Lightbulb,
-  LogOut, Menu, Mic, User, X, ChevronRight,
+  BarChart3,
+  BookOpen,
+  LayoutDashboard,
+  Lightbulb,
+  LogOut,
+  Menu,
+  Mic,
+  User,
+  X,
+  ChevronRight,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -10,24 +18,47 @@ const STYLE = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
 
   :root {
-    --bg:          #f7f5f2;
-    --surface:     #ffffff;
-    --surface-2:   #f0ede8;
-    --border:      #e8e3db;
-    --text-1:      #1a1714;
-    --text-2:      #6b6560;
-    --text-3:      #a09890;
-    --accent:      #d4622a;
-    --accent-soft: #fde8dc;
-    --accent-2:    #2a6dd4;
-    --shadow-sm:   0 1px 3px rgba(26,23,20,.06), 0 1px 2px rgba(26,23,20,.04);
-    --shadow-md:   0 4px 16px rgba(26,23,20,.08), 0 2px 6px rgba(26,23,20,.04);
-    --shadow-lg:   0 12px 40px rgba(26,23,20,.10), 0 4px 12px rgba(26,23,20,.06);
-    --radius:      14px;
-    --radius-sm:   8px;
+    --bg:          #0a0a0f;
+    --surface:     #16161f;
+    --surface-2:   #1e1e2b;
+    --surface-3:   #252535;
+    --border:      #2a2a3d;
+    --text-1:      #f0f0f5;
+    --text-2:      #b0b0c0;
+    --text-3:      #70707e;
+    --accent:      #ff6b35;
+    --accent-glow: rgba(255, 107, 53, 0.25);
+    --accent-soft: #2a1c16;
+    --accent-2:    #3b82f6;
+    --green:       #10b981;
+    --purple:      #a855f7;
+    --shadow-sm:   0 2px 8px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.2);
+    --shadow-md:   0 8px 24px rgba(0,0,0,.4), 0 4px 12px rgba(0,0,0,.3);
+    --shadow-lg:   0 16px 48px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.4);
+    --shadow-glow: 0 0 40px var(--accent-glow);
+    --radius:      16px;
+    --radius-sm:   10px;
     --sidebar-w:   260px;
     --font-display: 'Syne', sans-serif;
     --font-body:    'DM Sans', sans-serif;
+  }
+
+  [data-theme="light"] {
+    --bg:          #f7f5f2;
+    --surface:     #ffffff;
+    --surface-2:   #f0ede8;
+    --surface-3:   #e8e3db;
+    --border:      #d8d3cb;
+    --text-1:      #1a1714;
+    --text-2:      #6b6560;
+    --text-3:      #a09890;
+    --accent:      #ff6b35;
+    --accent-glow: rgba(255, 107, 53, 0.15);
+    --accent-soft: #fde8dc;
+    --shadow-sm:   0 1px 3px rgba(26,23,20,.06), 0 1px 2px rgba(26,23,20,.04);
+    --shadow-md:   0 4px 16px rgba(26,23,20,.08), 0 2px 6px rgba(26,23,20,.04);
+    --shadow-lg:   0 12px 40px rgba(26,23,20,.10), 0 4px 12px rgba(26,23,20,.06);
+    --shadow-glow: 0 0 20px var(--accent-glow);
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -38,6 +69,7 @@ const STYLE = `
     background: var(--bg);
     color: var(--text-1);
     -webkit-font-smoothing: antialiased;
+    transition: background 0.3s ease, color 0.3s ease;
   }
 
   /* ── Shell ── */
@@ -370,25 +402,29 @@ const STYLE = `
     box-shadow: 0 6px 16px rgba(212,98,42,.4);
   }
   .pub-main { flex: 1; }
-`
+`;
 
 const navItems = [
-  { to: "/dashboard",   label: "Dashboard",   icon: LayoutDashboard },
-  { to: "/interview",   label: "Interview",   icon: Mic },
-  { to: "/analytics",  label: "Analytics",   icon: BarChart3 },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/interview", label: "Interview", icon: Mic },
+  { to: "/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/suggestions", label: "Suggestions", icon: Lightbulb },
   { to: "/preparation", label: "Preparation", icon: BookOpen },
-  { to: "/profile",    label: "Profile",     icon: User },
-]
+  { to: "/profile", label: "Profile", icon: User },
+];
 
 function SidebarContent({ user, onNavClick, onLogout }) {
-  const initial = user?.email?.[0]?.toUpperCase() || 'U'
+  const initial = user?.email?.[0]?.toUpperCase() || "U";
 
   return (
     <>
       <Link to="/dashboard" className="sidebar-logo" onClick={onNavClick}>
-        <div className="logo-icon"><Mic size={16} /></div>
-        <span className="logo-text">Interview<span>.</span>AI</span>
+        <div className="logo-icon">
+          <Mic size={16} />
+        </div>
+        <span className="logo-text">
+          Interview<span>.</span>AI
+        </span>
       </Link>
 
       <nav className="sidebar-nav">
@@ -397,10 +433,12 @@ function SidebarContent({ user, onNavClick, onLogout }) {
           <NavLink
             key={to}
             to={to}
-            className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+            className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}
             onClick={onNavClick}
           >
-            <span className="nav-icon"><Icon size={15} /></span>
+            <span className="nav-icon">
+              <Icon size={15} />
+            </span>
             {label}
             <span className="nav-active-dot" />
           </NavLink>
@@ -411,10 +449,12 @@ function SidebarContent({ user, onNavClick, onLogout }) {
           <NavLink
             key={to}
             to={to}
-            className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+            className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}
             onClick={onNavClick}
           >
-            <span className="nav-icon"><Icon size={15} /></span>
+            <span className="nav-icon">
+              <Icon size={15} />
+            </span>
             {label}
             <span className="nav-active-dot" />
           </NavLink>
@@ -424,7 +464,7 @@ function SidebarContent({ user, onNavClick, onLogout }) {
       <div className="sidebar-footer">
         <div className="user-card">
           <div className="user-avatar">{initial}</div>
-          <span className="user-email">{user?.email || 'User'}</span>
+          <span className="user-email">{user?.email || "User"}</span>
         </div>
         <button className="logout-btn" onClick={onLogout}>
           <LogOut size={14} />
@@ -432,15 +472,18 @@ function SidebarContent({ user, onNavClick, onLogout }) {
         </button>
       </div>
     </>
-  )
+  );
 }
 
 export default function Layout() {
-  const { isAuthenticated, user, logout } = useAuthStore()
-  const navigate = useNavigate()
-  const [open, setOpen] = useState(false)
+  const { isAuthenticated, user, logout } = useAuthStore();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
 
-  const handleLogout = () => { logout(); navigate("/login") }
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
 
   if (!isAuthenticated) {
     return (
@@ -450,32 +493,51 @@ export default function Layout() {
           <header className="pub-header">
             <div className="pub-header-inner">
               <Link to="/" className="pub-logo">
-                <div className="logo-icon" style={{ width: 32, height: 32, borderRadius: 9, background: 'linear-gradient(135deg, #d4622a 0%, #e8864a 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(212,98,42,.3)' }}>
+                <div
+                  className="logo-icon"
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 9,
+                    background:
+                      "linear-gradient(135deg, #d4622a 0%, #e8864a 100%)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#fff",
+                    boxShadow: "0 4px 12px rgba(212,98,42,.3)",
+                  }}
+                >
                   <Mic size={15} />
                 </div>
-                <span className="pub-logo-text">Interview<span>.</span>AI</span>
+                <span className="pub-logo-text">
+                  Interview<span>.</span>AI
+                </span>
               </Link>
               <nav className="pub-nav">
-                <Link to="/login" className="pub-login">Sign in</Link>
+                <Link to="/login" className="pub-login">
+                  Sign in
+                </Link>
                 <Link to="/register" className="pub-cta">
                   Get Started <ChevronRight size={14} />
                 </Link>
               </nav>
             </div>
           </header>
-          <main className="pub-main"><Outlet /></main>
+          <main className="pub-main">
+            <Outlet />
+          </main>
         </div>
       </>
-    )
+    );
   }
 
   return (
     <>
       <style>{STYLE}</style>
       <div className="shell">
-
         {/* Sidebar */}
-        <aside className={`sidebar${open ? ' mobile-open' : ''}`}>
+        <aside className={`sidebar${open ? " mobile-open" : ""}`}>
           <SidebarContent
             user={user}
             onNavClick={() => setOpen(false)}
@@ -485,7 +547,7 @@ export default function Layout() {
 
         {/* Mobile overlay */}
         <div
-          className={`mobile-overlay${open ? ' visible' : ''}`}
+          className={`mobile-overlay${open ? " visible" : ""}`}
           onClick={() => setOpen(false)}
         />
 
@@ -494,7 +556,9 @@ export default function Layout() {
           {/* Mobile topbar */}
           <header className="topbar">
             <Link to="/dashboard" className="topbar-logo">
-              <div className="topbar-logo-icon"><Mic size={14} /></div>
+              <div className="topbar-logo-icon">
+                <Mic size={14} />
+              </div>
               <span className="topbar-logo-text">Interview AI</span>
             </Link>
             <button className="menu-btn" onClick={() => setOpen(true)}>
@@ -506,8 +570,7 @@ export default function Layout() {
             <Outlet />
           </main>
         </div>
-
       </div>
     </>
-  )
+  );
 }

@@ -37,31 +37,71 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-cyan-100 py-12 px-4">
-      <div className="max-w-md w-full">
+    <div
+      className="min-h-screen flex items-center justify-center py-12 px-4"
+      style={{
+        background:
+          "linear-gradient(135deg, #0a0a0f 0%, #1e1e2b 50%, #16161f 100%)",
+      }}
+    >
+      <div className="max-w-md w-full animate-scale-in">
         <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <div className="bg-gradient-to-br from-primary-500 to-primary-600 rounded-full p-4 shadow-lg">
-              <Mic className="w-12 h-12 text-white" />
+          <div className="flex justify-center mb-6">
+            <div
+              style={{
+                background: "linear-gradient(135deg, #ff6b35 0%, #a855f7 100%)",
+                boxShadow:
+                  "0 8px 32px rgba(255, 107, 53, 0.3), 0 4px 16px rgba(0,0,0,0.3)",
+              }}
+              className="rounded-full p-5 shadow-lg transition-transform hover:scale-110 hover:rotate-6"
+            >
+              <Mic className="w-14 h-14 text-white" />
             </div>
           </div>
-          <h2 className="text-3xl font-bold text-gray-900">Welcome Back</h2>
-          <p className="text-gray-600 mt-2">
+          <h2
+            className="text-4xl font-bold mb-3"
+            style={{
+              fontFamily: "'Syne', sans-serif",
+              background: "linear-gradient(135deg, #f0f0f5 0%, #ff6b35 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}
+          >
+            Welcome Back
+          </h2>
+          <p style={{ color: "#b0b0c0" }} className="text-lg">
             Login to continue your interview prep
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg p-8">
+        <div
+          style={{
+            background: "#16161f",
+            border: "2px solid #2a2a3d",
+            boxShadow:
+              "0 16px 48px rgba(0,0,0,0.5), 0 8px 24px rgba(0,0,0,0.4)",
+          }}
+          className="rounded-2xl p-8"
+        >
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                className="block text-sm font-semibold mb-2"
+                style={{ color: "#b0b0c0" }}
+              >
                 Email Address
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition"
+                style={{
+                  background: "#1e1e2b",
+                  border: "2px solid #2a2a3d",
+                  color: "#f0f0f5",
+                }}
+                className="w-full px-4 py-3 rounded-xl outline-none transition-all focus:border-[#ff6b35] focus:shadow-[0_0_0_3px_rgba(255,107,53,0.25)]"
                 required
                 placeholder="you@example.com"
                 disabled={loading}
@@ -69,7 +109,10 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                className="block text-sm font-semibold mb-2"
+                style={{ color: "#b0b0c0" }}
+              >
                 Password
               </label>
               <div className="relative">
@@ -77,7 +120,12 @@ export default function Login() {
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition"
+                  style={{
+                    background: "#1e1e2b",
+                    border: "2px solid #2a2a3d",
+                    color: "#f0f0f5",
+                  }}
+                  className="w-full px-4 py-3 rounded-xl outline-none transition-all focus:border-[#ff6b35] focus:shadow-[0_0_0_3px_rgba(255,107,53,0.25)]"
                   required
                   placeholder="••••••••"
                   minLength={6}
@@ -86,20 +134,45 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3.5 text-gray-500 hover:text-gray-700"
+                  className="absolute right-3 top-3.5 transition-colors"
+                  style={{ color: "#70707e" }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.color = "#ff6b35")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.color = "#70707e")
+                  }
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
             </div>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg">
+              <div
+                style={{
+                  background:
+                    "linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%)",
+                  border: "2px solid rgba(239, 68, 68, 0.3)",
+                  boxShadow: "0 4px 12px rgba(239, 68, 68, 0.2)",
+                }}
+                className="p-4 rounded-xl animate-shake"
+              >
                 <div className="flex items-start">
-                  <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+                  <AlertCircle
+                    className="w-5 h-5 mr-3 flex-shrink-0 mt-0.5"
+                    style={{ color: "#ef4444" }}
+                  />
                   <div className="flex-1">
-                    <p className="text-sm font-medium">Login Failed</p>
-                    <p className="text-sm mt-1">{error}</p>
+                    <p
+                      className="text-sm font-semibold"
+                      style={{ color: "#ef4444" }}
+                    >
+                      Login Failed
+                    </p>
+                    <p className="text-sm mt-1" style={{ color: "#ef4444" }}>
+                      {error}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -108,26 +181,37 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 disabled:from-gray-400 disabled:to-gray-400 text-white font-semibold py-3 rounded-lg transition duration-200 flex items-center justify-center gap-2"
+              style={{
+                background: loading
+                  ? "#6b7280"
+                  : "linear-gradient(135deg, #ff6b35 0%, #a855f7 100%)",
+                boxShadow: loading
+                  ? "none"
+                  : "0 8px 32px rgba(255, 107, 53, 0.3), 0 4px 16px rgba(0,0,0,0.3)",
+              }}
+              className="w-full text-white font-bold py-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 hover:transform hover:-translate-y-1 hover:shadow-[0_12px_48px_rgba(255,107,53,0.4),0_6px_24px_rgba(0,0,0,0.4)]"
             >
               {loading ? "Logging in..." : "Login"}
             </button>
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm" style={{ color: "#b0b0c0" }}>
               Don't have an account?{" "}
               <Link
                 to="/register"
-                className="text-primary-600 hover:text-primary-700 font-semibold"
+                className="font-bold transition-colors"
+                style={{ color: "#ff6b35" }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#a855f7")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#ff6b35")}
               >
                 Create one
               </Link>
             </p>
           </div>
 
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-xs text-gray-500 text-center">
+          <div className="mt-6 pt-6" style={{ borderTop: "1px solid #2a2a3d" }}>
+            <p className="text-xs text-center" style={{ color: "#70707e" }}>
               Use your registered email and password to log in.
             </p>
           </div>

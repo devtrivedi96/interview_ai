@@ -1,15 +1,36 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { sessionService } from '../services/sessionService'
-import { analyticsService } from '../services/analyticsService'
-import { useProfileStore } from '../stores/profileStore'
-import { useAuthStore } from '../stores/authStore'
-import PreferencesModal from '../components/PreferencesModal'
-import { Award, BarChart3, Play, TrendingUp, User, Zap, Clock, ChevronRight, Target } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { sessionService } from "../services/sessionService";
+import { analyticsService } from "../services/analyticsService";
+import { useProfileStore } from "../stores/profileStore";
+import { useAuthStore } from "../stores/authStore";
+import PreferencesModal from "../components/PreferencesModal";
+import ThemeToggle from "../components/ThemeToggle";
 import {
-  Bar, BarChart, CartesianGrid, Line, LineChart, Pie, PieChart,
-  ResponsiveContainer, Tooltip, XAxis, YAxis, Cell,
-} from 'recharts'
+  Award,
+  BarChart3,
+  Play,
+  TrendingUp,
+  User,
+  Zap,
+  Clock,
+  ChevronRight,
+  Target,
+} from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+  Cell,
+} from "recharts";
 
 /*
   ─────────────────────────────────────────────
@@ -20,28 +41,47 @@ const STYLE = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
 
   :root {
+    --bg:        #0a0a0f;
+    --surface:   #16161f;
+    --surface-2: #1e1e2b;
+    --border:    #2a2a3d;
+    --text-1:    #f0f0f5;
+    --text-2:    #b0b0c0;
+    --text-3:    #70707e;
+    --accent:    #ff6b35;
+    --accent-2:  #3b82f6;
+    --accent-3:  #10b981;
+    --accent-glow: rgba(255, 107, 53, 0.25);
+    --accent-soft: #2a1c16;
+    --purple:    #a855f7;
+    --shadow-sm: 0 2px 8px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.2);
+    --shadow-md: 0 8px 24px rgba(0,0,0,.4), 0 4px 12px rgba(0,0,0,.3);
+    --shadow-lg: 0 16px 48px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.4);
+    --shadow-glow: 0 0 40px var(--accent-glow);
+    --radius:    16px;
+    --radius-sm: 10px;
+    --font-display: 'Syne', sans-serif;
+    --font-body:    'DM Sans', sans-serif;
+  }
+
+  [data-theme="light"] {
     --bg:        #f7f5f2;
     --surface:   #ffffff;
     --surface-2: #f0ede8;
-    --border:    #e8e3db;
+    --border:    #d8d3cb;
     --text-1:    #1a1714;
     --text-2:    #6b6560;
     --text-3:    #a09890;
-    --accent:    #d4622a;
-    --accent-2:  #2a6dd4;
-    --accent-3:  #22a67a;
+    --accent:    #ff6b35;
+    --accent-2:  #3b82f6;
+    --accent-3:  #10b981;
+    --accent-glow: rgba(255, 107, 53, 0.15);
     --accent-soft: #fde8dc;
+    --purple:    #a855f7;
     --shadow-sm: 0 1px 3px rgba(26,23,20,.06), 0 1px 2px rgba(26,23,20,.04);
     --shadow-md: 0 4px 16px rgba(26,23,20,.08), 0 2px 6px rgba(26,23,20,.04);
     --shadow-lg: 0 12px 40px rgba(26,23,20,.10), 0 4px 12px rgba(26,23,20,.06);
-    --radius:    14px;
-    --radius-sm: 8px;
-    --font-display: 'Syne', sans-serif;
-    --font-body:    'DM Sans', sans-serif;
-    font-family: var(--font-body);
-    font-size: 15px;
-    background: var(--bg);
-    color: var(--text-1);
+    --shadow-glow: 0 0 20px var(--accent-glow);
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -52,6 +92,9 @@ const STYLE = `
     padding: 36px 28px 80px;
     min-height: 100vh;
     background: var(--bg);
+    font-family: var(--font-body);
+    font-size: 15px;
+    color: var(--text-1);
   }
 
   /* ── Header ── */
@@ -492,9 +535,9 @@ const STYLE = `
   .db-root > *:nth-child(5) { animation-delay: .25s; }
   .db-root > *:nth-child(6) { animation-delay: .30s; }
   .db-root > *:nth-child(7) { animation-delay: .35s; }
-`
+`;
 
-const PIE_COLORS = ['#d4622a', '#2a6dd4', '#22a67a', '#a855f7', '#f59e0b']
+const PIE_COLORS = ["#d4622a", "#2a6dd4", "#22a67a", "#a855f7", "#f59e0b"];
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload?.length) {
@@ -502,36 +545,46 @@ const CustomTooltip = ({ active, payload, label }) => {
       <div className="custom-tip">
         <div style={{ fontWeight: 700, marginBottom: 2 }}>{label}</div>
         {payload.map((p, i) => (
-          <div key={i} style={{ color: p.color }}>{p.name}: <strong>{p.value}</strong></div>
+          <div key={i} style={{ color: p.color }}>
+            {p.name}: <strong>{p.value}</strong>
+          </div>
         ))}
       </div>
-    )
+    );
   }
-  return null
-}
+  return null;
+};
 
 export default function Dashboard() {
-  const [sessions, setSessions] = useState([])
-  const [progress, setProgress] = useState(null)
-  const [cards, setCards] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [selectedMode, setSelectedMode] = useState('DSA')
-  const [difficulty, setDifficulty] = useState(3)
-  const [creating, setCreating] = useState(false)
+  const [sessions, setSessions] = useState([]);
+  const [progress, setProgress] = useState(null);
+  const [cards, setCards] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedMode, setSelectedMode] = useState("DSA");
+  const [difficulty, setDifficulty] = useState(3);
+  const [creating, setCreating] = useState(false);
 
-  const navigate = useNavigate()
-  const { user } = useAuthStore()
-  const { showPreferencesModal, setShowModal, initPreferences, preferences, fetchPreferences } = useProfileStore()
-  const initDoneRef = useRef(false)
-
-  useEffect(() => { loadData() }, [])
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const {
+    showPreferencesModal,
+    setShowModal,
+    initPreferences,
+    preferences,
+    fetchPreferences,
+  } = useProfileStore();
+  const initDoneRef = useRef(false);
 
   useEffect(() => {
-    if (initDoneRef.current) return
-    initDoneRef.current = true
-    initPreferences()
-    fetchPreferences()
-  }, [initPreferences, fetchPreferences])
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    if (initDoneRef.current) return;
+    initDoneRef.current = true;
+    initPreferences();
+    fetchPreferences();
+  }, [initPreferences, fetchPreferences]);
 
   const loadData = async () => {
     try {
@@ -539,59 +592,78 @@ export default function Dashboard() {
         sessionService.listSessions(20),
         analyticsService.getProgress(20),
         sessionService.getInterviewCards().catch(() => ({ cards: [] })),
-      ])
-      const loadedSessions = sessionsData?.sessions || []
-      setSessions(loadedSessions)
-      setProgress(progressData)
-      setCards(cardsData?.cards || [])
-      if (loadedSessions.length > 0 && !loadedSessions.find((s) => s.mode === selectedMode)) {
-        setSelectedMode(loadedSessions[0].mode)
+      ]);
+      const loadedSessions = sessionsData?.sessions || [];
+      setSessions(loadedSessions);
+      setProgress(progressData);
+      setCards(cardsData?.cards || []);
+      if (
+        loadedSessions.length > 0 &&
+        !loadedSessions.find((s) => s.mode === selectedMode)
+      ) {
+        setSelectedMode(loadedSessions[0].mode);
       }
     } catch (err) {
-      console.error('Failed to load data:', err)
+      console.error("Failed to load data:", err);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleStartInterview = async () => {
-    setCreating(true)
+    setCreating(true);
     try {
-      const session = await sessionService.createSession(selectedMode, difficulty)
-      await sessionService.startSession(session.id)
-      navigate(`/interview/${session.id}`)
+      const session = await sessionService.createSession(
+        selectedMode,
+        difficulty,
+      );
+      await sessionService.startSession(session.id);
+      navigate(`/interview/${session.id}`);
     } catch (err) {
-      console.error('Failed:', err)
-      alert('Failed to start interview. Please try again.')
+      console.error("Failed:", err);
+      alert("Failed to start interview. Please try again.");
     } finally {
-      setCreating(false)
+      setCreating(false);
     }
-  }
+  };
 
   const modeCounts = useMemo(() => {
-    const counts = sessions.reduce((acc, s) => { acc[s.mode] = (acc[s.mode] || 0) + 1; return acc }, {})
-    return Object.entries(counts).map(([mode, count]) => ({ mode, count }))
-  }, [sessions])
+    const counts = sessions.reduce((acc, s) => {
+      acc[s.mode] = (acc[s.mode] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(counts).map(([mode, count]) => ({ mode, count }));
+  }, [sessions]);
 
   const scoreTrend = useMemo(() => {
     return sessions
       .filter((s) => s.total_score != null)
-      .slice().reverse()
-      .map((s, idx) => ({ label: `S${idx + 1}`, score: Number(s.total_score) }))
-  }, [sessions])
+      .slice()
+      .reverse()
+      .map((s, idx) => ({
+        label: `S${idx + 1}`,
+        score: Number(s.total_score),
+      }));
+  }, [sessions]);
 
   const topMode = useMemo(() => {
-    if (!modeCounts.length) return 'N/A'
-    return modeCounts.slice().sort((a, b) => b.count - a.count)[0].mode
-  }, [modeCounts])
+    if (!modeCounts.length) return "N/A";
+    return modeCounts.slice().sort((a, b) => b.count - a.count)[0].mode;
+  }, [modeCounts]);
 
   const averageScore = useMemo(() => {
-    const scored = sessions.filter((s) => s.total_score != null)
-    if (!scored.length) return null
-    return scored.reduce((sum, s) => sum + Number(s.total_score), 0) / scored.length
-  }, [sessions])
+    const scored = sessions.filter((s) => s.total_score != null);
+    if (!scored.length) return null;
+    return (
+      scored.reduce((sum, s) => sum + Number(s.total_score), 0) / scored.length
+    );
+  }, [sessions]);
 
-  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+  const today = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
 
   if (loading) {
     return (
@@ -602,58 +674,109 @@ export default function Dashboard() {
           <p className="loader-text">Loading your dashboard…</p>
         </div>
       </>
-    )
+    );
   }
 
   const interviewOptions = cards.length
     ? cards
     : [
-      { mode: 'DSA', title: 'Data Structures & Algorithms' },
-      { mode: 'HR', title: 'HR Interview' },
-      { mode: 'BEHAVIORAL', title: 'Behavioral' },
-      { mode: 'SYSTEM_DESIGN', title: 'System Design' },
-    ]
+        { mode: "DSA", title: "Data Structures & Algorithms" },
+        { mode: "HR", title: "HR Interview" },
+        { mode: "BEHAVIORAL", title: "Behavioral" },
+        { mode: "SYSTEM_DESIGN", title: "System Design" },
+      ];
 
-  const diffLabels = { 1: 'Easy', 2: 'Easy+', 3: 'Medium', 4: 'Hard', 5: 'Expert' }
+  const diffLabels = {
+    1: "Easy",
+    2: "Easy+",
+    3: "Medium",
+    4: "Hard",
+    5: "Expert",
+  };
 
   return (
     <>
       <style>{STYLE}</style>
       <div className="db-root">
-
         {/* ── Header ── */}
         <div className="db-header">
           <div>
-            <h1 className="db-title">Interview<span>.</span>AI</h1>
-            <p className="db-subtitle">Track your progress and sharpen your skills</p>
+            <h1 className="db-title">
+              Interview<span>.</span>AI
+            </h1>
+            <p className="db-subtitle">
+              Track your progress and sharpen your skills
+            </p>
           </div>
           <div className="db-header-date">{today}</div>
         </div>
 
         {/* ── Stat Cards ── */}
         <div className="db-stats">
-          <div className="stat-card" style={{ '--stripe': '#d4622a', '--icon-bg': '#fde8dc', '--icon-color': '#d4622a' }}>
-            <div className="stat-icon"><BarChart3 size={16} /></div>
+          <div
+            className="stat-card"
+            style={{
+              "--stripe": "#d4622a",
+              "--icon-bg": "#fde8dc",
+              "--icon-color": "#d4622a",
+            }}
+          >
+            <div className="stat-icon">
+              <BarChart3 size={16} />
+            </div>
             <div className="stat-label">Total Sessions</div>
-            <div className="stat-value">{progress?.total_sessions || sessions.length || 0}</div>
+            <div className="stat-value">
+              {progress?.total_sessions || sessions.length || 0}
+            </div>
           </div>
 
-          <div className="stat-card" style={{ '--stripe': '#2a6dd4', '--icon-bg': '#dbeafe', '--icon-color': '#2a6dd4' }}>
-            <div className="stat-icon"><TrendingUp size={16} /></div>
+          <div
+            className="stat-card"
+            style={{
+              "--stripe": "#2a6dd4",
+              "--icon-bg": "#dbeafe",
+              "--icon-color": "#2a6dd4",
+            }}
+          >
+            <div className="stat-icon">
+              <TrendingUp size={16} />
+            </div>
             <div className="stat-label">Average Score</div>
-            <div className="stat-value">{averageScore ? averageScore.toFixed(1) : '—'}</div>
+            <div className="stat-value">
+              {averageScore ? averageScore.toFixed(1) : "—"}
+            </div>
           </div>
 
-          <div className="stat-card" style={{ '--stripe': '#22a67a', '--icon-bg': '#d1fae5', '--icon-color': '#22a67a' }}>
-            <div className="stat-icon"><Zap size={16} /></div>
+          <div
+            className="stat-card"
+            style={{
+              "--stripe": "#22a67a",
+              "--icon-bg": "#d1fae5",
+              "--icon-color": "#22a67a",
+            }}
+          >
+            <div className="stat-icon">
+              <Zap size={16} />
+            </div>
             <div className="stat-label">Interview Tracks</div>
             <div className="stat-value">{cards.length || 4}</div>
           </div>
 
-          <div className="stat-card" style={{ '--stripe': '#a855f7', '--icon-bg': '#f3e8ff', '--icon-color': '#a855f7' }}>
-            <div className="stat-icon"><Award size={16} /></div>
+          <div
+            className="stat-card"
+            style={{
+              "--stripe": "#a855f7",
+              "--icon-bg": "#f3e8ff",
+              "--icon-color": "#a855f7",
+            }}
+          >
+            <div className="stat-icon">
+              <Award size={16} />
+            </div>
             <div className="stat-label">Top Interview Type</div>
-            <div className={`stat-value ${topMode.length > 5 ? 'sm' : ''}`}>{topMode}</div>
+            <div className={`stat-value ${topMode.length > 5 ? "sm" : ""}`}>
+              {topMode}
+            </div>
           </div>
         </div>
 
@@ -667,28 +790,54 @@ export default function Dashboard() {
             <div className="profile-row">
               <div className="profile-field">
                 <div className="pf-label">Email</div>
-                <div className="pf-value">{user?.email || 'N/A'}</div>
+                <div className="pf-value">{user?.email || "N/A"}</div>
               </div>
               <div className="profile-field">
                 <div className="pf-label">Experience Level</div>
-                {preferences?.experience_level
-                  ? <span className="tag accent" style={{ textTransform: 'capitalize' }}>{preferences.experience_level}</span>
-                  : <div className="pf-value" style={{ color: 'var(--text-3)' }}>Not set</div>
-                }
+                {preferences?.experience_level ? (
+                  <span
+                    className="tag accent"
+                    style={{ textTransform: "capitalize" }}
+                  >
+                    {preferences.experience_level}
+                  </span>
+                ) : (
+                  <div className="pf-value" style={{ color: "var(--text-3)" }}>
+                    Not set
+                  </div>
+                )}
               </div>
               <div className="profile-field">
                 <div className="pf-label">Preferred Roles</div>
-                {preferences?.preferred_roles?.length
-                  ? <div className="tag-list">{preferences.preferred_roles.map(r => <span key={r} className="tag">{r}</span>)}</div>
-                  : <div className="pf-value" style={{ color: 'var(--text-3)' }}>Not set</div>
-                }
+                {preferences?.preferred_roles?.length ? (
+                  <div className="tag-list">
+                    {preferences.preferred_roles.map((r) => (
+                      <span key={r} className="tag">
+                        {r}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="pf-value" style={{ color: "var(--text-3)" }}>
+                    Not set
+                  </div>
+                )}
               </div>
               <div className="profile-field">
                 <div className="pf-label">Preferred Modes</div>
-                {preferences?.preferred_interview_modes?.length
-                  ? <div className="tag-list">{preferences.preferred_interview_modes.map(m => <span key={m} className="tag accent">{m}</span>)}</div>
-                  : <div className="pf-value" style={{ color: 'var(--text-3)' }}>Not set</div>
-                }
+                {preferences?.preferred_interview_modes?.length ? (
+                  <div className="tag-list">
+                    {preferences.preferred_interview_modes.map((m) => (
+                      <span key={m} className="tag accent">
+                        {m}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="pf-value" style={{ color: "var(--text-3)" }}>
+                    Not set
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -701,20 +850,52 @@ export default function Dashboard() {
             {modeCounts.length ? (
               <ResponsiveContainer width="100%" height={270}>
                 <BarChart data={modeCounts} barSize={32}>
-                  <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
-                  <XAxis dataKey="mode" tick={{ fontFamily: 'DM Sans', fontSize: 12, fill: 'var(--text-2)' }} axisLine={false} tickLine={false} />
-                  <YAxis allowDecimals={false} tick={{ fontFamily: 'DM Sans', fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} />
+                  <CartesianGrid
+                    strokeDasharray="2 4"
+                    stroke="var(--border)"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="mode"
+                    tick={{
+                      fontFamily: "DM Sans",
+                      fontSize: 12,
+                      fill: "var(--text-2)",
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{
+                      fontFamily: "DM Sans",
+                      fontSize: 11,
+                      fill: "var(--text-3)",
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="count" fill="var(--accent)" radius={[6, 6, 0, 0]}>
-                    {modeCounts.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  <Bar
+                    dataKey="count"
+                    fill="var(--accent)"
+                    radius={[6, 6, 0, 0]}
+                  >
+                    {modeCounts.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
               <div className="empty-state">
-                <div className="empty-icon"><BarChart3 size={22} /></div>
+                <div className="empty-icon">
+                  <BarChart3 size={22} />
+                </div>
                 <div className="empty-title">No data yet</div>
-                <div className="empty-sub">Start an interview to see your distribution</div>
+                <div className="empty-sub">
+                  Start an interview to see your distribution
+                </div>
               </div>
             )}
           </div>
@@ -730,18 +911,56 @@ export default function Dashboard() {
             {scoreTrend.length ? (
               <ResponsiveContainer width="100%" height={240}>
                 <LineChart data={scoreTrend}>
-                  <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontFamily: 'DM Sans', fontSize: 12, fill: 'var(--text-2)' }} axisLine={false} tickLine={false} />
-                  <YAxis domain={[0, 5]} tick={{ fontFamily: 'DM Sans', fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} />
+                  <CartesianGrid
+                    strokeDasharray="2 4"
+                    stroke="var(--border)"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="label"
+                    tick={{
+                      fontFamily: "DM Sans",
+                      fontSize: 12,
+                      fill: "var(--text-2)",
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    domain={[0, 5]}
+                    tick={{
+                      fontFamily: "DM Sans",
+                      fontSize: 11,
+                      fill: "var(--text-3)",
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
                   <Tooltip content={<CustomTooltip />} />
-                  <Line type="monotone" dataKey="score" stroke="#2a6dd4" strokeWidth={2.5} dot={{ r: 4, fill: '#2a6dd4', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
+                  <Line
+                    type="monotone"
+                    dataKey="score"
+                    stroke="#2a6dd4"
+                    strokeWidth={2.5}
+                    dot={{
+                      r: 4,
+                      fill: "#2a6dd4",
+                      strokeWidth: 2,
+                      stroke: "#fff",
+                    }}
+                    activeDot={{ r: 6 }}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
               <div className="empty-state">
-                <div className="empty-icon"><TrendingUp size={22} /></div>
+                <div className="empty-icon">
+                  <TrendingUp size={22} />
+                </div>
                 <div className="empty-title">No scores yet</div>
-                <div className="empty-sub">Complete interviews to see your progress</div>
+                <div className="empty-sub">
+                  Complete interviews to see your progress
+                </div>
               </div>
             )}
           </div>
@@ -754,17 +973,34 @@ export default function Dashboard() {
             {modeCounts.length ? (
               <ResponsiveContainer width="100%" height={240}>
                 <PieChart>
-                  <Pie data={modeCounts} dataKey="count" nameKey="mode" outerRadius={95} innerRadius={50} paddingAngle={3} label={({ mode, percent }) => `${mode} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
-                    {modeCounts.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  <Pie
+                    data={modeCounts}
+                    dataKey="count"
+                    nameKey="mode"
+                    outerRadius={95}
+                    innerRadius={50}
+                    paddingAngle={3}
+                    label={({ mode, percent }) =>
+                      `${mode} ${(percent * 100).toFixed(0)}%`
+                    }
+                    labelLine={false}
+                  >
+                    {modeCounts.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
                   </Pie>
                   <Tooltip content={<CustomTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
               <div className="empty-state">
-                <div className="empty-icon"><Target size={22} /></div>
+                <div className="empty-icon">
+                  <Target size={22} />
+                </div>
                 <div className="empty-title">No interviews yet</div>
-                <div className="empty-sub">Your mode breakdown will appear here</div>
+                <div className="empty-sub">
+                  Your mode breakdown will appear here
+                </div>
               </div>
             )}
           </div>
@@ -779,25 +1015,53 @@ export default function Dashboard() {
           <div className="start-grid">
             <div>
               <label className="form-label">Interview Type</label>
-              <select value={selectedMode} onChange={(e) => setSelectedMode(e.target.value)} className="start-select">
+              <select
+                value={selectedMode}
+                onChange={(e) => setSelectedMode(e.target.value)}
+                className="start-select"
+              >
                 {interviewOptions.map((c) => (
-                  <option key={c.mode} value={c.mode}>{c.title || c.mode}</option>
+                  <option key={c.mode} value={c.mode}>
+                    {c.title || c.mode}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
               <label className="form-label">Difficulty</label>
               <div className="diff-row">
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,.55)', fontWeight: 500 }}>Starting level</span>
+                <span
+                  style={{
+                    fontSize: 13,
+                    color: "rgba(255,255,255,.55)",
+                    fontWeight: 500,
+                  }}
+                >
+                  Starting level
+                </span>
                 <span className="diff-value">{diffLabels[difficulty]}</span>
               </div>
-              <input type="range" min="1" max="5" value={difficulty} onChange={(e) => setDifficulty(Number(e.target.value))} />
-              <div className="diff-labels"><span>Easy</span><span>Medium</span><span>Hard</span></div>
+              <input
+                type="range"
+                min="1"
+                max="5"
+                value={difficulty}
+                onChange={(e) => setDifficulty(Number(e.target.value))}
+              />
+              <div className="diff-labels">
+                <span>Easy</span>
+                <span>Medium</span>
+                <span>Hard</span>
+              </div>
             </div>
           </div>
-          <button onClick={handleStartInterview} disabled={creating} className="start-btn">
+          <button
+            onClick={handleStartInterview}
+            disabled={creating}
+            className="start-btn"
+          >
             <Play size={14} />
-            {creating ? 'Starting…' : 'Start Interview'}
+            {creating ? "Starting…" : "Start Interview"}
           </button>
         </div>
 
@@ -809,9 +1073,13 @@ export default function Dashboard() {
           </div>
           {sessions.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon"><Clock size={22} /></div>
+              <div className="empty-icon">
+                <Clock size={22} />
+              </div>
               <div className="empty-title">No sessions yet</div>
-              <div className="empty-sub">Start your first interview above to get going</div>
+              <div className="empty-sub">
+                Start your first interview above to get going
+              </div>
             </div>
           ) : (
             <div className="db-table-wrap">
@@ -829,23 +1097,47 @@ export default function Dashboard() {
                 <tbody>
                   {sessions.map((session) => (
                     <tr key={session.id}>
-                      <td><span className="mode-badge">{session.mode}</span></td>
-                      <td style={{ color: 'var(--text-2)', fontSize: 13 }}>{new Date(session.created_at).toLocaleDateString()}</td>
-                      <td style={{ color: 'var(--text-2)', fontSize: 13 }}>{session.questions_count}</td>
                       <td>
-                        {session.total_score
-                          ? <span className="score-val">{Number(session.total_score).toFixed(1)}</span>
-                          : <span style={{ color: 'var(--text-3)', fontSize: 13 }}>—</span>
-                        }
+                        <span className="mode-badge">{session.mode}</span>
+                      </td>
+                      <td style={{ color: "var(--text-2)", fontSize: 13 }}>
+                        {new Date(session.created_at).toLocaleDateString()}
+                      </td>
+                      <td style={{ color: "var(--text-2)", fontSize: 13 }}>
+                        {session.questions_count}
                       </td>
                       <td>
-                        <span className={session.state === 'COMPLETE' ? 'status-complete' : 'status-active'}>
+                        {session.total_score ? (
+                          <span className="score-val">
+                            {Number(session.total_score).toFixed(1)}
+                          </span>
+                        ) : (
+                          <span
+                            style={{ color: "var(--text-3)", fontSize: 13 }}
+                          >
+                            —
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <span
+                          className={
+                            session.state === "COMPLETE"
+                              ? "status-complete"
+                              : "status-active"
+                          }
+                        >
                           {session.state}
                         </span>
                       </td>
                       <td>
-                        {session.state === 'COMPLETE' && (
-                          <button className="view-link" onClick={() => navigate(`/session/${session.id}/summary`)}>
+                        {session.state === "COMPLETE" && (
+                          <button
+                            className="view-link"
+                            onClick={() =>
+                              navigate(`/session/${session.id}/summary`)
+                            }
+                          >
                             View <ChevronRight size={12} />
                           </button>
                         )}
@@ -857,10 +1149,12 @@ export default function Dashboard() {
             </div>
           )}
         </div>
-
       </div>
 
-      <PreferencesModal isOpen={showPreferencesModal} onClose={() => setShowModal(false)} />
+      <PreferencesModal
+        isOpen={showPreferencesModal}
+        onClose={() => setShowModal(false)}
+      />
     </>
-  )
+  );
 }

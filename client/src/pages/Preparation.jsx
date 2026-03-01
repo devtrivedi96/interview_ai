@@ -1,11 +1,42 @@
-import { useState } from 'react'
-import api from '../services/api'
-import { BookOpen, Sparkles, CheckCircle2, ArrowRight, AlertCircle } from 'lucide-react'
+import { useState } from "react";
+import api from "../services/api";
+import {
+  BookOpen,
+  Sparkles,
+  CheckCircle2,
+  ArrowRight,
+  AlertCircle,
+} from "lucide-react";
+import ThemeToggle from "../components/ThemeToggle";
 
 const STYLE = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
 
   :root {
+    --bg:          #0a0a0f;
+    --surface:     #1a1a24;
+    --surface-2:   #252533;
+    --border:      #3a3a4a;
+    --text-1:      #f0f0f3;
+    --text-2:      #a8a8b3;
+    --text-3:      #6a6a7a;
+    --accent:      #ff6b35;
+    --accent-soft: rgba(255, 107, 53, 0.15);
+    --green:       #10b981;
+    --green-soft:  rgba(16, 185, 129, 0.15);
+    --purple:      #a855f7;
+    --purple-soft: rgba(168, 85, 247, 0.15);
+    --blue:        #3b82f6;
+    --blue-soft:   rgba(59, 130, 246, 0.15);
+    --shadow-sm:   0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-md:   0 4px 16px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.2);
+    --radius:      14px;
+    --radius-sm:   10px;
+    --font-display: 'Syne', sans-serif;
+    --font-body:    'DM Sans', sans-serif;
+  }
+
+  [data-theme="light"] {
     --bg:          #f7f5f2;
     --surface:     #ffffff;
     --surface-2:   #f0ede8;
@@ -13,29 +44,36 @@ const STYLE = `
     --text-1:      #1a1714;
     --text-2:      #6b6560;
     --text-3:      #a09890;
-    --accent:      #d4622a;
     --accent-soft: #fde8dc;
-    --green:       #22a67a;
     --green-soft:  #d1fae5;
+    --purple-soft: rgba(168, 85, 247, 0.1);
+    --blue-soft:   rgba(59, 130, 246, 0.1);
     --shadow-sm:   0 1px 3px rgba(26,23,20,.06), 0 1px 2px rgba(26,23,20,.04);
     --shadow-md:   0 4px 16px rgba(26,23,20,.08), 0 2px 6px rgba(26,23,20,.04);
-    --radius:      14px;
-    --radius-sm:   10px;
-    --font-display: 'Syne', sans-serif;
-    --font-body:    'DM Sans', sans-serif;
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   .pp-root {
     max-width: 1040px;
+    margin: 0 auto;
     padding: 36px 24px 80px;
     font-family: var(--font-body);
     color: var(--text-1);
+    background: var(--bg);
+    min-height: 100vh;
+    transition: background 0.3s ease, color 0.3s ease;
   }
 
   /* Header */
-  .pp-header { margin-bottom: 32px; }
+  .pp-header { 
+    margin-bottom: 32px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
   .pp-title {
     font-family: var(--font-display);
     font-size: clamp(2rem, 4vw, 2.8rem);
@@ -215,36 +253,56 @@ const STYLE = `
   .pp-section-card:nth-child(4) { animation-delay: .26s }
   .pp-section-card:nth-child(5) { animation-delay: .32s }
   .pp-section-card:nth-child(6) { animation-delay: .38s }
-`
+`;
 
 export default function Preparation() {
-  const [topicsInput, setTopicsInput] = useState('arrays, system design, behavioral communication')
-  const [loading, setLoading] = useState(false)
-  const [plan, setPlan] = useState(null)
-  const [error, setError] = useState('')
+  const [topicsInput, setTopicsInput] = useState(
+    "arrays, system design, behavioral communication",
+  );
+  const [loading, setLoading] = useState(false);
+  const [plan, setPlan] = useState(null);
+  const [error, setError] = useState("");
 
   const generatePlan = async () => {
-    const topics = topicsInput.split(',').map((t) => t.trim()).filter(Boolean)
-    if (!topics.length) { setError('Please enter at least one topic.'); return }
-    setLoading(true); setError('')
+    const topics = topicsInput
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    if (!topics.length) {
+      setError("Please enter at least one topic.");
+      return;
+    }
+    setLoading(true);
+    setError("");
     try {
-      const response = await api.post('/profile/preparation/plan', { topics })
-      setPlan(response.data.plan)
+      const response = await api.post("/profile/preparation/plan", { topics });
+      setPlan(response.data.plan);
     } catch (e) {
-      setError(e.response?.data?.detail || 'Failed to generate plan. Please try again.')
-      setPlan(null)
-    } finally { setLoading(false) }
-  }
+      setError(
+        e.response?.data?.detail ||
+          "Failed to generate plan. Please try again.",
+      );
+      setPlan(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <>
       <style>{STYLE}</style>
       <div className="pp-root">
-
         {/* Header */}
         <div className="pp-header">
-          <h1 className="pp-title">Preparation<span>.</span></h1>
-          <p className="pp-subtitle">Enter topics and get a personalized AI learning roadmap.</p>
+          <div>
+            <h1 className="pp-title">
+              Preparation<span>.</span>
+            </h1>
+            <p className="pp-subtitle">
+              Enter topics and get a personalized AI learning roadmap.
+            </p>
+          </div>
+          <ThemeToggle />
         </div>
 
         {/* Input card */}
@@ -257,12 +315,23 @@ export default function Preparation() {
             placeholder="e.g. dynamic programming, distributed systems, conflict resolution"
           />
           <div className="pp-input-footer">
-            <span className="pp-hint">Each topic becomes a dedicated section in your plan.</span>
-            <button className="pp-gen-btn" onClick={generatePlan} disabled={loading}>
-              {loading
-                ? <><div className="pp-spin" /> Generating…</>
-                : <><Sparkles size={14} /> Generate Plan</>
-              }
+            <span className="pp-hint">
+              Each topic becomes a dedicated section in your plan.
+            </span>
+            <button
+              className="pp-gen-btn"
+              onClick={generatePlan}
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <div className="pp-spin" /> Generating…
+                </>
+              ) : (
+                <>
+                  <Sparkles size={14} /> Generate Plan
+                </>
+              )}
             </button>
           </div>
           {error && (
@@ -284,7 +353,10 @@ export default function Preparation() {
                 {section.tasks?.length > 0 && (
                   <>
                     <div className="pp-list-label">
-                      <ArrowRight size={11} style={{ color: 'var(--accent)' }} />
+                      <ArrowRight
+                        size={11}
+                        style={{ color: "var(--accent)" }}
+                      />
                       Tasks
                     </div>
                     <div className="pp-list">
@@ -302,7 +374,10 @@ export default function Preparation() {
                   <>
                     <hr className="pp-card-divider" />
                     <div className="pp-list-label">
-                      <CheckCircle2 size={11} style={{ color: 'var(--green)' }} />
+                      <CheckCircle2
+                        size={11}
+                        style={{ color: "var(--green)" }}
+                      />
                       Outcomes
                     </div>
                     <div className="pp-list">
@@ -319,8 +394,7 @@ export default function Preparation() {
             ))}
           </div>
         )}
-
       </div>
     </>
-  )
+  );
 }

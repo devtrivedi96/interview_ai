@@ -1,12 +1,59 @@
-import { useState, useEffect } from 'react'
-import { analyticsService } from '../services/analyticsService'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
-import { TrendingUp, TrendingDown, Minus, BarChart3, CheckCircle2, ArrowRight, Target, Sparkles } from 'lucide-react'
+import { useState, useEffect } from "react";
+import { analyticsService } from "../services/analyticsService";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+} from "recharts";
+import {
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  BarChart3,
+  CheckCircle2,
+  ArrowRight,
+  Target,
+  Sparkles,
+} from "lucide-react";
+import ThemeToggle from "../components/ThemeToggle";
 
 const STYLE = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
 
   :root {
+    --bg:          #0a0a0f;
+    --surface:     #1a1a24;
+    --surface-2:   #252533;
+    --border:      #3a3a4a;
+    --text-1:      #f0f0f3;
+    --text-2:      #a8a8b3;
+    --text-3:      #6a6a7a;
+    --accent:      #ff6b35;
+    --accent-soft: rgba(255, 107, 53, 0.15);
+    --green:       #10b981;
+    --green-soft:  rgba(16, 185, 129, 0.15);
+    --purple:      #a855f7;
+    --purple-soft: rgba(168, 85, 247, 0.15);
+    --amber:       #f59e0b;
+    --amber-soft:  rgba(245, 158, 11, 0.15);
+    --blue:        #3b82f6;
+    --blue-soft:   rgba(59, 130, 246, 0.15);
+    --red:         #ef4444;
+    --red-soft:    rgba(239, 68, 68, 0.15);
+    --shadow-sm:   0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-md:   0 4px 16px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.2);
+    --radius:      14px;
+    --radius-sm:   8px;
+    --font-display: 'Syne', sans-serif;
+    --font-body:    'DM Sans', sans-serif;
+  }
+
+  [data-theme="light"] {
     --bg:          #f7f5f2;
     --surface:     #ffffff;
     --surface-2:   #f0ede8;
@@ -14,22 +61,14 @@ const STYLE = `
     --text-1:      #1a1714;
     --text-2:      #6b6560;
     --text-3:      #a09890;
-    --accent:      #d4622a;
     --accent-soft: #fde8dc;
-    --green:       #22a67a;
     --green-soft:  #d1fae5;
-    --amber:       #d97706;
+    --purple-soft: rgba(168, 85, 247, 0.1);
     --amber-soft:  #fef3c7;
-    --blue:        #2a6dd4;
     --blue-soft:   #dbeafe;
-    --red:         #dc2626;
     --red-soft:    #fee2e2;
     --shadow-sm:   0 1px 3px rgba(26,23,20,.06), 0 1px 2px rgba(26,23,20,.04);
     --shadow-md:   0 4px 16px rgba(26,23,20,.08), 0 2px 6px rgba(26,23,20,.04);
-    --radius:      14px;
-    --radius-sm:   8px;
-    --font-display: 'Syne', sans-serif;
-    --font-body:    'DM Sans', sans-serif;
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -40,6 +79,9 @@ const STYLE = `
     padding: 36px 24px 80px;
     font-family: var(--font-body);
     color: var(--text-1);
+    background: var(--bg);
+    min-height: 100vh;
+    transition: background 0.3s ease, color 0.3s ease;
   }
 
   /* Loading */
@@ -64,6 +106,15 @@ const STYLE = `
     gap: 16px;
     margin-bottom: 36px;
     flex-wrap: wrap;
+  }
+
+  .an-header-content {
+    display: flex;
+    align-items: flex-end;
+    gap: 24px;
+    flex-wrap: wrap;
+    flex: 1;
+    justify-content: space-between;
   }
   .an-title {
     font-family: var(--font-display);
@@ -272,92 +323,180 @@ const STYLE = `
   .an-root > *:nth-child(4) { animation-delay: .20s }
   .an-root > *:nth-child(5) { animation-delay: .25s }
   .an-root > *:nth-child(6) { animation-delay: .30s }
-`
+`;
 
 const CustomTooltip = ({ active, payload, label }) => {
-  if (!active || !payload?.length) return null
+  if (!active || !payload?.length) return null;
   return (
     <div className="an-tooltip">
-      <div className="an-tooltip-label">{new Date(label).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
-      <div className="an-tooltip-val">{Number(payload[0].value).toFixed(2)}</div>
+      <div className="an-tooltip-label">
+        {new Date(label).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        })}
+      </div>
+      <div className="an-tooltip-val">
+        {Number(payload[0].value).toFixed(2)}
+      </div>
     </div>
-  )
-}
+  );
+};
 
 export default function Analytics() {
-  const [insights, setInsights] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [days, setDays] = useState(30)
+  const [insights, setInsights] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [days, setDays] = useState(30);
 
-  useEffect(() => { loadInsights() }, [days])
+  useEffect(() => {
+    loadInsights();
+  }, [days]);
 
   const loadInsights = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const data = await analyticsService.getInsights(days)
-      setInsights(data)
+      const data = await analyticsService.getInsights(days);
+      setInsights(data);
     } catch (err) {
-      console.error('Failed to load insights:', err)
-    } finally { setLoading(false) }
-  }
+      console.error("Failed to load insights:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const trend = insights?.trend || 'stable'
+  const trend = insights?.trend || "stable";
   const trendMeta = {
-    improving: { label: 'Improving', icon: <TrendingUp size={14} />, cls: 'improving' },
-    declining:  { label: 'Declining',  icon: <TrendingDown size={14} />, cls: 'declining' },
-    stable:     { label: 'Stable',     icon: <Minus size={14} />,        cls: 'stable' },
-  }[trend] || { label: 'Stable', icon: <Minus size={14} />, cls: 'stable' }
+    improving: {
+      label: "Improving",
+      icon: <TrendingUp size={14} />,
+      cls: "improving",
+    },
+    declining: {
+      label: "Declining",
+      icon: <TrendingDown size={14} />,
+      cls: "declining",
+    },
+    stable: { label: "Stable", icon: <Minus size={14} />, cls: "stable" },
+  }[trend] || { label: "Stable", icon: <Minus size={14} />, cls: "stable" };
 
-  if (loading) return (
-    <>
-      <style>{STYLE}</style>
-      <div className="an-root">
-        <div className="an-loading">
-          <div className="an-loader" />
-          <p style={{ fontSize: 14, color: 'var(--text-3)', fontFamily: 'var(--font-body)' }}>Loading analytics…</p>
+  if (loading)
+    return (
+      <>
+        <style>{STYLE}</style>
+        <div className="an-root">
+          <div className="an-loading">
+            <div className="an-loader" />
+            <p
+              style={{
+                fontSize: 14,
+                color: "var(--text-3)",
+                fontFamily: "var(--font-body)",
+              }}
+            >
+              Loading analytics…
+            </p>
+          </div>
         </div>
-      </div>
-    </>
-  )
+      </>
+    );
 
   return (
     <>
       <style>{STYLE}</style>
       <div className="an-root">
-
         {/* Header */}
         <div className="an-header">
-          <div>
-            <h1 className="an-title">Analytics<span>.</span></h1>
-            <p className="an-subtitle">Track your growth over time</p>
+          <div className="an-header-content">
+            <div>
+              <h1 className="an-title">
+                Analytics<span>.</span>
+              </h1>
+              <p className="an-subtitle">Track your growth over time</p>
+            </div>
+            <div
+              style={{ display: "flex", alignItems: "flex-end", gap: "16px" }}
+            >
+              <select
+                className="an-period-select"
+                value={days}
+                onChange={(e) => setDays(Number(e.target.value))}
+              >
+                <option value={7}>Last 7 days</option>
+                <option value={30}>Last 30 days</option>
+                <option value={90}>Last 90 days</option>
+              </select>
+              <ThemeToggle />
+            </div>
           </div>
-          <select className="an-period-select" value={days} onChange={(e) => setDays(Number(e.target.value))}>
-            <option value={7}>Last 7 days</option>
-            <option value={30}>Last 30 days</option>
-            <option value={90}>Last 90 days</option>
-          </select>
         </div>
 
         {/* Stats */}
         <div className="an-stats">
-          <div className="an-stat" style={{ '--stripe': '#d4622a', '--icon-bg': '#fde8dc', '--icon-color': '#d4622a' }}>
-            <div className="an-stat-icon"><BarChart3 size={15} /></div>
+          <div
+            className="an-stat"
+            style={{
+              "--stripe": "#d4622a",
+              "--icon-bg": "#fde8dc",
+              "--icon-color": "#d4622a",
+            }}
+          >
+            <div className="an-stat-icon">
+              <BarChart3 size={15} />
+            </div>
             <div className="an-stat-label">Total Sessions</div>
             <div className="an-stat-value">{insights?.total_sessions || 0}</div>
           </div>
 
-          <div className="an-stat" style={{ '--stripe': trend === 'improving' ? '#22a67a' : trend === 'declining' ? '#dc2626' : '#2a6dd4', '--icon-bg': trend === 'improving' ? '#d1fae5' : trend === 'declining' ? '#fee2e2' : '#dbeafe', '--icon-color': trend === 'improving' ? '#22a67a' : trend === 'declining' ? '#dc2626' : '#2a6dd4' }}>
+          <div
+            className="an-stat"
+            style={{
+              "--stripe":
+                trend === "improving"
+                  ? "#22a67a"
+                  : trend === "declining"
+                    ? "#dc2626"
+                    : "#2a6dd4",
+              "--icon-bg":
+                trend === "improving"
+                  ? "#d1fae5"
+                  : trend === "declining"
+                    ? "#fee2e2"
+                    : "#dbeafe",
+              "--icon-color":
+                trend === "improving"
+                  ? "#22a67a"
+                  : trend === "declining"
+                    ? "#dc2626"
+                    : "#2a6dd4",
+            }}
+          >
             <div className="an-stat-icon">{trendMeta.icon}</div>
             <div className="an-stat-label">Performance Trend</div>
-            <div className={`an-stat-value trend-${trendMeta.cls}`} style={{ fontSize: '1.3rem', textTransform: 'capitalize' }}>
-              <span className={`trend-badge ${trendMeta.cls}`}>{trendMeta.icon}{trendMeta.label}</span>
+            <div
+              className={`an-stat-value trend-${trendMeta.cls}`}
+              style={{ fontSize: "1.3rem", textTransform: "capitalize" }}
+            >
+              <span className={`trend-badge ${trendMeta.cls}`}>
+                {trendMeta.icon}
+                {trendMeta.label}
+              </span>
             </div>
           </div>
 
-          <div className="an-stat" style={{ '--stripe': '#a855f7', '--icon-bg': '#f3e8ff', '--icon-color': '#a855f7' }}>
-            <div className="an-stat-icon"><Target size={15} /></div>
+          <div
+            className="an-stat"
+            style={{
+              "--stripe": "#a855f7",
+              "--icon-bg": "#f3e8ff",
+              "--icon-color": "#a855f7",
+            }}
+          >
+            <div className="an-stat-icon">
+              <Target size={15} />
+            </div>
             <div className="an-stat-label">Focus Areas</div>
-            <div className="an-stat-value">{insights?.recommended_focus?.length || 0}</div>
+            <div className="an-stat-value">
+              {insights?.recommended_focus?.length || 0}
+            </div>
           </div>
         </div>
 
@@ -369,27 +508,58 @@ export default function Analytics() {
               <span className="an-section-title">Score Progression</span>
             </div>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={insights.scores_over_time} margin={{ top: 6, right: 6, bottom: 0, left: -10 }}>
-                <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
+              <LineChart
+                data={insights.scores_over_time}
+                margin={{ top: 6, right: 6, bottom: 0, left: -10 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="2 4"
+                  stroke="var(--border)"
+                  vertical={false}
+                />
                 <XAxis
                   dataKey="date"
-                  tick={{ fontFamily: 'DM Sans', fontSize: 12, fill: 'var(--text-3)' }}
-                  axisLine={false} tickLine={false}
-                  tickFormatter={(d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  tick={{
+                    fontFamily: "DM Sans",
+                    fontSize: 12,
+                    fill: "var(--text-3)",
+                  }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(d) =>
+                    new Date(d).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    })
+                  }
                 />
                 <YAxis
                   domain={[0, 5]}
-                  tick={{ fontFamily: 'DM Sans', fontSize: 11, fill: 'var(--text-3)' }}
-                  axisLine={false} tickLine={false}
+                  tick={{
+                    fontFamily: "DM Sans",
+                    fontSize: 11,
+                    fill: "var(--text-3)",
+                  }}
+                  axisLine={false}
+                  tickLine={false}
                 />
-                <ReferenceLine y={2.5} stroke="var(--border)" strokeDasharray="4 4" />
+                <ReferenceLine
+                  y={2.5}
+                  stroke="var(--border)"
+                  strokeDasharray="4 4"
+                />
                 <Tooltip content={<CustomTooltip />} />
                 <Line
                   type="monotone"
                   dataKey="score"
                   stroke="var(--accent)"
                   strokeWidth={2.5}
-                  dot={{ r: 4, fill: 'var(--accent)', strokeWidth: 2, stroke: '#fff' }}
+                  dot={{
+                    r: 4,
+                    fill: "var(--accent)",
+                    strokeWidth: 2,
+                    stroke: "#fff",
+                  }}
                   activeDot={{ r: 6 }}
                 />
               </LineChart>
@@ -404,12 +574,18 @@ export default function Analytics() {
               <CheckCircle2 size={15} />
               Common Strengths
             </div>
-            {insights?.common_strengths?.length ? insights.common_strengths.map((s, i) => (
-              <div key={i} className="an-fb-item">
-                <CheckCircle2 size={13} className="green" />
-                {s}
+            {insights?.common_strengths?.length ? (
+              insights.common_strengths.map((s, i) => (
+                <div key={i} className="an-fb-item">
+                  <CheckCircle2 size={13} className="green" />
+                  {s}
+                </div>
+              ))
+            ) : (
+              <div className="an-empty">
+                Complete more sessions to see patterns
               </div>
-            )) : <div className="an-empty">Complete more sessions to see patterns</div>}
+            )}
           </div>
 
           <div className="an-fb-card">
@@ -417,12 +593,18 @@ export default function Analytics() {
               <ArrowRight size={15} />
               Areas to Improve
             </div>
-            {insights?.common_improvements?.length ? insights.common_improvements.map((s, i) => (
-              <div key={i} className="an-fb-item">
-                <ArrowRight size={13} className="amber" />
-                {s}
+            {insights?.common_improvements?.length ? (
+              insights.common_improvements.map((s, i) => (
+                <div key={i} className="an-fb-item">
+                  <ArrowRight size={13} className="amber" />
+                  {s}
+                </div>
+              ))
+            ) : (
+              <div className="an-empty">
+                Complete more sessions to see patterns
               </div>
-            )) : <div className="an-empty">Complete more sessions to see patterns</div>}
+            )}
           </div>
         </div>
 
@@ -443,8 +625,7 @@ export default function Analytics() {
             </div>
           </div>
         )}
-
       </div>
     </>
-  )
+  );
 }
