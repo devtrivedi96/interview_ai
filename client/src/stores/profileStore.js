@@ -1,6 +1,21 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import api from "../services/api";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { auth, db } from "../config/firebase";
+import { useAuthStore } from "./authStore";
+
+const nowIso = () => new Date().toISOString();
+
+const toIsoString = (value) => {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value?.toDate === "function") return value.toDate().toISOString();
+  return null;
+};
+
+const getUserId = () =>
+  useAuthStore.getState().user?.id || auth.currentUser?.uid || null;
 
 export const useProfileStore = create(
   persist(
@@ -16,8 +31,26 @@ export const useProfileStore = create(
       fetchPreferences: async () => {
         set({ loading: true, error: null });
         try {
-          const response = await api.get("/profile/preferences");
-          const { exists, preferences } = response.data;
+          const userId = getUserId();
+          if (!userId) {
+            set({
+              preferences: null,
+              preferencesExists: false,
+              loading: false,
+            });
+            return false;
+          }
+
+          const userSnap = await getDoc(doc(db, "users", userId));
+          const userData = userSnap.exists() ? userSnap.data() || {} : {};
+          const rawPreferences = (userData.profile || {}).preferences;
+          const exists = Boolean(rawPreferences);
+          const preferences = rawPreferences
+            ? {
+                ...rawPreferences,
+                updated_at: toIsoString(rawPreferences.updated_at) || nowIso(),
+              }
+            : null;
 
           set({
             preferences,
@@ -31,7 +64,7 @@ export const useProfileStore = create(
           console.error("Failed to fetch preferences:", error);
           set({
             loading: false,
-            error: error.response?.data?.detail || "Failed to fetch preferences",
+            error: error.message || "Failed to fetch preferences",
           });
           return false;
         }
@@ -41,15 +74,31 @@ export const useProfileStore = create(
       savePreferences: async (prefsData) => {
         set({ loading: true, error: null });
         try {
-          const response = await api.post("/profile/preferences", {
+          const userId = getUserId();
+          if (!userId) {
+            throw new Error("User must be logged in to save preferences");
+          }
+
+          const now = nowIso();
+          const preferences = {
             tech_stack: prefsData.tech_stack,
             preferred_roles: prefsData.preferred_roles,
             experience_level: prefsData.experience_level,
             target_company_type: prefsData.target_company_type,
             preferred_interview_modes: prefsData.preferred_interview_modes,
-          });
+            updated_at: now,
+          };
 
-          const { exists, preferences } = response.data;
+          await setDoc(
+            doc(db, "users", userId),
+            {
+              profile: { preferences },
+              updated_at: now,
+            },
+            { merge: true },
+          );
+
+          const exists = true;
           set({
             preferences,
             preferencesExists: exists,
@@ -63,7 +112,7 @@ export const useProfileStore = create(
           console.error("Failed to save preferences:", error);
           set({
             loading: false,
-            error: error.response?.data?.detail || "Failed to save preferences",
+            error: error.message || "Failed to save preferences",
           });
           return false;
         }
