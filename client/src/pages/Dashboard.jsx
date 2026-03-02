@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { sessionService } from "../services/sessionService";
 import { analyticsService } from "../services/analyticsService";
+import api from "../services/api";
 import { useProfileStore } from "../stores/profileStore";
 import { useAuthStore } from "../stores/authStore";
 import PreferencesModal from "../components/PreferencesModal";
@@ -403,6 +404,63 @@ const STYLE = `
   .start-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
   @media (max-width: 640px) { .start-grid { grid-template-columns: 1fr; } }
 
+  .suggest-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    background: rgba(15,15,15,.4);
+    border: 1px solid rgba(255,255,255,.08);
+    margin-bottom: 18px;
+  }
+  .suggest-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,.55);
+  }
+  .suggest-main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .suggest-title {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .suggest-pill {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.08);
+    color: rgba(255,255,255,.75);
+  }
+  .suggest-apply {
+    margin-left: auto;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.18);
+    background: rgba(255,255,255,.04);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .suggest-apply:hover { background: rgba(255,255,255,.08); }
+  .suggest-questions {
+    font-size: 11.5px;
+    color: rgba(255,255,255,.72);
+  }
+  .suggest-questions ul {
+    margin: 4px 0 0;
+    padding-left: 18px;
+  }
+  .suggest-questions li { margin-bottom: 2px; }
+
   /* ── Table ── */
   .db-table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; }
@@ -563,6 +621,7 @@ export default function Dashboard() {
   const [selectedMode, setSelectedMode] = useState("DSA");
   const [difficulty, setDifficulty] = useState(3);
   const [creating, setCreating] = useState(false);
+  const [suggestion, setSuggestion] = useState(null);
 
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -588,15 +647,21 @@ export default function Dashboard() {
 
   const loadData = async () => {
     try {
-      const [sessionsData, progressData, cardsData] = await Promise.all([
-        sessionService.listSessions(20),
-        analyticsService.getProgress(20),
-        sessionService.getInterviewCards().catch(() => ({ cards: [] })),
-      ]);
+      const [sessionsData, progressData, cardsData, suggestedData] =
+        await Promise.all([
+          sessionService.listSessions(20),
+          analyticsService.getProgress(20),
+          sessionService.getInterviewCards().catch(() => ({ cards: [] })),
+          api
+            .get("/profile/suggested-interview")
+            .then((res) => res.data)
+            .catch(() => null),
+        ]);
       const loadedSessions = sessionsData?.sessions || [];
       setSessions(loadedSessions);
       setProgress(progressData);
       setCards(cardsData?.cards || []);
+      setSuggestion(suggestedData);
       if (
         loadedSessions.length > 0 &&
         !loadedSessions.find((s) => s.mode === selectedMode)
@@ -609,6 +674,16 @@ export default function Dashboard() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!suggestion) return;
+    if (suggestion.mode) {
+      setSelectedMode(suggestion.mode);
+    }
+    if (suggestion.difficulty) {
+      setDifficulty(suggestion.difficulty);
+    }
+  }, [suggestion]);
 
   const handleStartInterview = async () => {
     setCreating(true);
@@ -627,6 +702,10 @@ export default function Dashboard() {
     }
   };
 
+  const handleViewQuestions = (sessionId) => {
+    navigate(`/session/${sessionId}/qa-summary`);
+  };
+
   const modeCounts = useMemo(() => {
     const counts = sessions.reduce((acc, s) => {
       acc[s.mode] = (acc[s.mode] || 0) + 1;
@@ -637,12 +716,11 @@ export default function Dashboard() {
 
   const scoreTrend = useMemo(() => {
     return sessions
-      .filter((s) => s.total_score != null)
       .slice()
       .reverse()
       .map((s, idx) => ({
         label: `S${idx + 1}`,
-        score: Number(s.total_score),
+        score: s.total_score != null ? Number(s.total_score) : 3,
       }));
   }, [sessions]);
 
@@ -652,11 +730,12 @@ export default function Dashboard() {
   }, [modeCounts]);
 
   const averageScore = useMemo(() => {
-    const scored = sessions.filter((s) => s.total_score != null);
-    if (!scored.length) return null;
-    return (
-      scored.reduce((sum, s) => sum + Number(s.total_score), 0) / scored.length
-    );
+    if (!sessions.length) return null;
+    const totalScore = sessions.reduce((sum, s) => {
+      // Use actual score if available, otherwise use 3 as default
+      return sum + (s.total_score != null ? Number(s.total_score) : 3);
+    }, 0);
+    return totalScore / sessions.length;
   }, [sessions]);
 
   const today = new Date().toLocaleDateString("en-US", {
@@ -743,7 +822,7 @@ export default function Dashboard() {
             </div>
             <div className="stat-label">Average Score</div>
             <div className="stat-value">
-              {averageScore ? averageScore.toFixed(1) : "—"}
+              {averageScore !== null ? averageScore.toFixed(1) : "—"}
             </div>
           </div>
 
@@ -1012,6 +1091,41 @@ export default function Dashboard() {
             <Zap size={16} />
             <span className="section-title">Start New Interview</span>
           </div>
+          {suggestion && (
+            <div className="suggest-row">
+              <div className="suggest-label">AI Suggested Track</div>
+              <div className="suggest-main">
+                <span className="suggest-title">
+                  {suggestion.title || suggestion.mode}
+                </span>
+                <span className="suggest-pill">
+                  {suggestion.mode} •{" "}
+                  {diffLabels[suggestion.difficulty] || "Custom"}
+                </span>
+                <button
+                  type="button"
+                  className="suggest-apply"
+                  onClick={() => {
+                    if (suggestion.mode) setSelectedMode(suggestion.mode);
+                    if (suggestion.difficulty)
+                      setDifficulty(suggestion.difficulty);
+                  }}
+                >
+                  Use this setup
+                </button>
+              </div>
+              {suggestion.sample_questions?.length ? (
+                <div className="suggest-questions">
+                  Sample questions you might see:
+                  <ul>
+                    {suggestion.sample_questions.slice(0, 3).map((q, idx) => (
+                      <li key={idx}>{q}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          )}
           <div className="start-grid">
             <div>
               <label className="form-label">Interview Type</label>
@@ -1021,7 +1135,10 @@ export default function Dashboard() {
                 className="start-select"
               >
                 {interviewOptions.map((c) => (
-                  <option key={c.mode || c.key || c.id} value={c.mode || c.key || c.id}>
+                  <option
+                    key={c.id || c.key || c.mode}
+                    value={c.mode || c.key || c.id}
+                  >
                     {c.title || c.mode || c.key || c.id}
                   </option>
                 ))}
@@ -1107,15 +1224,15 @@ export default function Dashboard() {
                         {session.questions_count}
                       </td>
                       <td>
-                        {session.total_score ? (
+                        {session.total_score !== null &&
+                        session.total_score !== undefined &&
+                        session.total_score !== "" ? (
                           <span className="score-val">
                             {Number(session.total_score).toFixed(1)}
                           </span>
                         ) : (
-                          <span
-                            style={{ color: "var(--text-3)", fontSize: 13 }}
-                          >
-                            —
+                          <span className="score-val" style={{ opacity: 0.6 }}>
+                            3.0
                           </span>
                         )}
                       </td>
@@ -1131,16 +1248,32 @@ export default function Dashboard() {
                         </span>
                       </td>
                       <td>
-                        {session.state === "COMPLETE" && (
-                          <button
-                            className="view-link"
-                            onClick={() =>
-                              navigate(`/session/${session.id}/summary`)
-                            }
-                          >
-                            View <ChevronRight size={12} />
-                          </button>
-                        )}
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "8px",
+                            alignItems: "center",
+                          }}
+                        >
+                          {session.state === "COMPLETE" && (
+                            <>
+                              <button
+                                className="view-link"
+                                onClick={() => handleViewQuestions(session.id)}
+                              >
+                                Q&A <ChevronRight size={12} />
+                              </button>
+                              <button
+                                className="view-link"
+                                onClick={() =>
+                                  navigate(`/session/${session.id}/summary`)
+                                }
+                              >
+                                Summary <ChevronRight size={12} />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

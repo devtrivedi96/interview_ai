@@ -422,7 +422,10 @@ export default function InterviewCenter() {
         const data = await sessionService.getInterviewCards();
         if (Array.isArray(data?.cards) && data.cards.length > 0) {
           setCards(data.cards);
-          if (!data.cards.find((c) => (c.key || c.mode || c.id) === selectedMode)) {
+          // If current selection is not present, fall back to first card
+          if (
+            !data.cards.find((c) => (c.key || c.mode || c.id) === selectedMode)
+          ) {
             const first = data.cards[0];
             setSelectedMode(first.key || first.mode || first.id);
             setDifficulty(Number(first.difficulty_start || 3));
@@ -440,8 +443,14 @@ export default function InterviewCenter() {
   const handleStartInterview = async () => {
     setCreating(true);
     try {
+      // Find the active card so we can use its underlying mode
+      const active = cards.find(
+        (c) => (c.key || c.mode || c.id) === selectedMode,
+      );
+      const modeToSend = active?.mode || selectedMode;
+
       const session = await sessionService.createSession(
-        selectedMode,
+        modeToSend,
         difficulty,
       );
       await sessionService.startSession(session.id);
@@ -454,7 +463,9 @@ export default function InterviewCenter() {
     }
   };
 
-  const activeCard = cards.find((c) => (c.key || c.mode || c.id) === selectedMode);
+  const activeCard = cards.find(
+    (c) => (c.key || c.mode || c.id) === selectedMode,
+  );
   const activeMeta = MODE_META[selectedMode] || {
     color: "#d4622a",
     iconBg: "#fde8dc",

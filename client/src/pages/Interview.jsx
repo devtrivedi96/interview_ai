@@ -822,6 +822,92 @@ const STYLE = `
     color: var(--accent);
     font-weight: 700;
   }
+
+  /* Answered Questions Section */
+  .iv-answered-questions {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 24px;
+    margin-bottom: 32px;
+    box-shadow: var(--shadow-md);
+    animation: fade-in 0.5s ease 0.2s backwards;
+  }
+  .iv-answered-title {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-2);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .iv-answered-count {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--purple) 100%);
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: 100px;
+    font-size: 12px;
+    font-weight: 700;
+    box-shadow: 0 4px 12px var(--accent-glow);
+  }
+  .iv-answered-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .iv-answered-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--surface-2);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: default;
+  }
+  .iv-answered-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+  .iv-answered-number {
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-3);
+    text-transform: uppercase;
+  }
+  .iv-answered-score {
+    font-weight: 700;
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: var(--surface-3);
+    color: var(--text-1);
+  }
+  .iv-answered-score.good {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--green);
+  }
+  .iv-answered-score.average {
+    background: rgba(245, 158, 11, 0.2);
+    color: var(--amber);
+  }
+  .iv-answered-score.poor {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+  }
+  .iv-empty-answered {
+    text-align: center;
+    color: var(--text-3);
+    font-size: 13px;
+    padding: 12px;
+    font-style: italic;
+  }
 `;
 
 const MAX_QUESTIONS_PER_SESSION = Number(
@@ -878,9 +964,12 @@ export default function Interview() {
   const [autoFlow, setAutoFlow] = useState(true);
   const [handsFree, setHandsFree] = useState(true);
   const [autoNextCountdown, setAutoNextCountdown] = useState(0);
+  const [reviewCountdown, setReviewCountdown] = useState(0);
+  const [canProceedToNext, setCanProceedToNext] = useState(false);
   const [questionIndex, setQuestionIndex] = useState(1);
   const [questionsCount, setQuestionsCount] = useState(0);
   const [summary, setSummary] = useState(null);
+  const [answeredQuestions, setAnsweredQuestions] = useState([]);
   const [isFetchingSummary, setIsFetchingSummary] = useState(false);
   const [isFetchingTranscript, setIsFetchingTranscript] = useState(false);
   const [hasReachedMax, setHasReachedMax] = useState(false);
@@ -891,6 +980,7 @@ export default function Interview() {
   const startTimeRef = useRef(null);
   const utteranceRef = useRef(null);
   const autoNextTimerRef = useRef(null);
+  const reviewTimerRef = useRef(null);
 
   useEffect(() => {
     loadNextQuestion();
@@ -965,28 +1055,18 @@ export default function Interview() {
 
   useEffect(() => {
     if (!evaluation || summary) return;
-    if (hasReachedMax) {
-      const timer = setTimeout(() => {
-        fetchSummary();
-      }, 1200);
-      return () => clearTimeout(timer);
-    }
-    if (!autoFlow) return;
-    setAutoNextCountdown(4);
-    autoNextTimerRef.current = setInterval(() => {
-      setAutoNextCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(autoNextTimerRef.current);
-          loadNextQuestion();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+
+    // Show evaluation result and allow user to proceed manually
+    // User MUST click "Next Question" or "Complete Session" button to continue
+    setCanProceedToNext(true);
+    setReviewCountdown(0); // No auto countdown
+    setAutoNextCountdown(0); // No auto advance
+
     return () => {
+      if (reviewTimerRef.current) clearInterval(reviewTimerRef.current);
       if (autoNextTimerRef.current) clearInterval(autoNextTimerRef.current);
     };
-  }, [evaluation, autoFlow, hasReachedMax, summary]);
+  }, [evaluation, summary]);
 
   const speakQuestion = (text) => {
     if (!("speechSynthesis" in window) || !text) return;
@@ -1016,20 +1096,35 @@ export default function Interview() {
     try {
       const data = await sessionService.getNextQuestion(sessionId);
       setQuestion(data);
+
+      // Use the question_number from the server if available
+      // This ensures sequential numbering and prevents skipping
+      const nextNumber =
+        typeof data?.question_number === "number"
+          ? data.question_number
+          : typeof data?.questions_count === "number"
+            ? data.questions_count
+            : questionIndex + 1;
+
       const nextCount =
         typeof data?.questions_count === "number"
           ? data.questions_count
-          : questionsCount + 1;
+          : nextNumber;
+
       setQuestionsCount(nextCount);
+      setQuestionIndex(nextNumber);
       setHasReachedMax(nextCount >= MAX_QUESTIONS_PER_SESSION);
-      setQuestionIndex(nextCount || 1);
     } catch (err) {
       if (err?.response?.status === 400) {
         setHasReachedMax(true);
         await fetchSummary();
       } else {
         console.error(err);
-        showError("Failed to load question. Please try again.");
+        // Disable auto-flow on error to prevent infinite retry loop
+        setAutoFlow(false);
+        showError(
+          "Failed to load question. Auto-flow disabled. Please try again.",
+        );
       }
     } finally {
       setIsLoadingQuestion(false);
@@ -1051,21 +1146,47 @@ export default function Interview() {
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
       startTimeRef.current = Date.now();
+
+      // Ensure we collect all data chunks, not just non-empty ones
       mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+        console.log(`Audio chunk received: ${e.data.size} bytes`);
+        audioChunksRef.current.push(e.data);
       };
+
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, {
           type: "audio/webm",
         });
         const duration = (Date.now() - startTimeRef.current) / 1000;
+
+        console.log(
+          `Recording stopped. Total chunks: ${audioChunksRef.current.length}, Total blob size: ${audioBlob.size} bytes, Duration: ${duration.toFixed(2)}s`,
+        );
+
         stream.getTracks().forEach((t) => t.stop());
+
+        // Validate blob before submitting
+        if (audioBlob.size === 0) {
+          setError(
+            "Audio recording failed. Please ensure your microphone is working and try again.",
+          );
+          setIsRecording(false);
+          return;
+        }
+
         await submitAnswer(audioBlob, duration, questionIdAtRecordStart);
       };
-      mediaRecorder.start();
+
+      // Start recording with timeslice to ensure continuous data collection
+      mediaRecorder.start(1000); // Collect data every 1 second
       setIsRecording(true);
-    } catch {
+      console.log("Recording started");
+    } catch (err) {
+      console.error("Microphone access error:", err);
       alert("Please allow microphone access to record your answer.");
+      setError(
+        "Microphone access denied. Please check your browser permissions.",
+      );
     }
   };
 
@@ -1081,20 +1202,69 @@ export default function Interview() {
     setError("");
     try {
       if (!questionId) throw new Error("Question ID missing");
+
       const audioFile = new File([audioBlob], "answer.webm", {
         type: "audio/webm",
       });
-      // Log file size and prevent empty upload
+
+      console.log(
+        `Submitting audio: File size=${audioFile.size} bytes, Duration=${duration.toFixed(2)}s, Question=${questionId}`,
+      );
+
+      // Validate file size before upload
       if (audioFile.size === 0) {
-        setError("Audio file is empty. Please record your answer again.");
-        alert("Audio file is empty. Please record your answer again.");
+        const errorMsg =
+          "Audio file is empty. Please record your answer again.";
+        setError(errorMsg);
+        alert(errorMsg);
+        setIsSubmitting(false);
         return;
       }
+
+      if (audioFile.size > 10 * 1024 * 1024) {
+        // 10MB limit
+        const errorMsg =
+          "Audio file is too large. Please record a shorter answer.";
+        setError(errorMsg);
+        setIsSubmitting(false);
+        return;
+      }
+
       const result = await sessionService.submitAnswer(sessionId, questionId, {
         audioFile,
         audioDuration: duration,
       });
+
+      console.log("Answer evaluation received:", result);
+
       setEvaluation(result);
+
+      // Track answered question - prevent duplicates
+      const score = result?.composite_score ?? result?.score ?? 0;
+      setAnsweredQuestions((prev) => {
+        // Check if this question is already in the list
+        const isDuplicate = prev.some(
+          (q) => q.questionNumber === questionIndex,
+        );
+        if (isDuplicate) {
+          // Replace the existing entry with updated data
+          return prev.map((q) =>
+            q.questionNumber === questionIndex
+              ? { ...q, score: Number(score).toFixed(1), status: "answered" }
+              : q,
+          );
+        }
+        // Add new entry
+        return [
+          ...prev,
+          {
+            questionNumber: questionIndex,
+            score: Number(score).toFixed(1),
+            status: "answered",
+          },
+        ];
+      });
+
       const returnedCount =
         typeof result?.questions_count === "number"
           ? result.questions_count
@@ -1106,11 +1276,18 @@ export default function Interview() {
       if (result?.transcript) setTranscript(result.transcript);
       else if (result?.transcript_text) setTranscript(result.transcript_text);
       else if (result?.transcript_url || result?.transcript_json_url) {
-        fetchTranscriptFromUrl(result.transcript_url || result.transcript_json_url);
+        fetchTranscriptFromUrl(
+          result.transcript_url || result.transcript_json_url,
+        );
       }
     } catch (err) {
-      console.error(err);
-      showError("Failed to evaluate answer. Please try again.");
+      console.error("Answer submission error:", err);
+      const errorMsg =
+        err.response?.data?.detail ||
+        err.message ||
+        "Failed to evaluate answer. Please try again.";
+      showError(errorMsg);
+      setError(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -1366,7 +1543,10 @@ export default function Interview() {
               className={`iv-record-btn ${isRecording ? "recording" : "idle"}`}
               onClick={isRecording ? stopRecording : startRecording}
               disabled={
-                isSubmitting || isLoadingQuestion || !question || isSpeakingQuestion
+                isSubmitting ||
+                isLoadingQuestion ||
+                !question ||
+                isSpeakingQuestion
               }
             >
               {isRecording ? (
@@ -1419,10 +1599,47 @@ export default function Interview() {
                 {formatScore(compositeScore, 1, "0.0")}
                 <span className="iv-score-denom">/5</span>
               </div>
-              <div className="iv-confidence">
-                Confidence: {confidencePct}%
-              </div>
+              <div className="iv-confidence">Confidence: {confidencePct}%</div>
             </div>
+
+            {/* Answered Questions Section */}
+            {answeredQuestions.length > 0 && (
+              <div className="iv-answered-questions">
+                <div className="iv-answered-title">
+                  Questions Answered
+                  <span className="iv-answered-count">
+                    {answeredQuestions.length}
+                  </span>
+                </div>
+                <div className="iv-answered-list">
+                  {answeredQuestions.map((item, idx) => {
+                    const score = Number(item.score);
+                    let scoreClass = "good";
+                    if (score < 3) scoreClass = "poor";
+                    else if (score < 4) scoreClass = "average";
+
+                    return (
+                      <div key={idx} className="iv-answered-item">
+                        <span className="iv-answered-number">
+                          Q{item.questionNumber}
+                        </span>
+                        <span className={`iv-answered-score ${scoreClass}`}>
+                          {item.score}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {answeredQuestions.length === 0 && evaluation && (
+              <div className="iv-answered-questions">
+                <div className="iv-empty-answered">
+                  Answer a question to see your progress here
+                </div>
+              </div>
+            )}
 
             {/* Dimension scores */}
             {dimensionScores.length > 0 && (
@@ -1474,7 +1691,10 @@ export default function Interview() {
                   <CheckCircle2 size={15} />
                   Strengths
                 </div>
-                {(strengths.length ? strengths : ["Great structure and clarity."]).map((s, i) => (
+                {(strengths.length
+                  ? strengths
+                  : ["Great structure and clarity."]
+                ).map((s, i) => (
                   <div key={i} className="iv-fb-item">
                     <span className="iv-fb-icon green">
                       <CheckCircle2 size={13} />
@@ -1509,15 +1729,17 @@ export default function Interview() {
                 onClick={() =>
                   hasReachedMax ? fetchSummary() : loadNextQuestion()
                 }
-                disabled={isLoadingQuestion || isSubmitting}
+                disabled={
+                  isLoadingQuestion || isSubmitting || !canProceedToNext
+                }
               >
-                {hasReachedMax ? (
-                  "View Summary"
-                ) : autoFlow && autoNextCountdown > 0 ? (
+                {!canProceedToNext ? (
                   <>
-                    <span className="iv-countdown">{autoNextCountdown}</span>{" "}
-                    Next Question
+                    <span className="iv-countdown">{reviewCountdown}s</span>{" "}
+                    Review your answer
                   </>
+                ) : hasReachedMax ? (
+                  "View Summary"
                 ) : (
                   <>
                     Next Question <ChevronRight size={15} />
@@ -1534,4 +1756,3 @@ export default function Interview() {
     </>
   );
 }
-

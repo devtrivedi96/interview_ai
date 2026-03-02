@@ -1,8 +1,16 @@
-import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { sessionService } from '../services/sessionService'
-import { TrendingUp, Award, Target, ArrowRight, CheckCircle, Clock, BarChart } from 'lucide-react'
-import ThemeToggle from '../components/ThemeToggle'
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { sessionService } from "../services/sessionService";
+import {
+  TrendingUp,
+  Award,
+  Target,
+  ArrowRight,
+  CheckCircle,
+  Clock,
+  BarChart,
+} from "lucide-react";
+import ThemeToggle from "../components/ThemeToggle";
 
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
@@ -279,6 +287,56 @@ const STYLES = `
     line-height: 1.5;
   }
 
+  .transcript-container {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .transcript-qa {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    animation: fadeUp 0.5s ease-out;
+  }
+
+  .question-block {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--border);
+  }
+
+  .question-block h4 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    color: var(--accent);
+    font-size: 15px;
+  }
+
+  .answer-block {
+    padding: 12px;
+    background: var(--surface);
+    border-radius: 8px;
+    border-left: 3px solid var(--green);
+  }
+
+  .answer-block p {
+    color: var(--text-1);
+    margin: 8px 0;
+    font-size: 14px;
+  }
+
+  .answer-block strong {
+    color: var(--text-2);
+  }
+
+  .transcript-text {
+    color: var(--text-2) !important;
+    line-height: 1.6;
+    word-break: break-word;
+  }
+
   .action-buttons {
     display: flex;
     gap: 16px;
@@ -438,31 +496,35 @@ const STYLES = `
 `;
 
 export default function SessionSummary() {
-  const { sessionId } = useParams()
-  const navigate = useNavigate()
-  const [summary, setSummary] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const { sessionId } = useParams();
+  const navigate = useNavigate();
+  const [summary, setSummary] = useState(null);
+  const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadSummary()
-  }, [sessionId])
+    loadSummary();
+  }, [sessionId]);
 
   const loadSummary = async () => {
     try {
-      const data = await sessionService.getSummary(sessionId)
-      setSummary(data)
+      const data = await sessionService.getSummary(sessionId);
+      setSummary(data);
+      // Fetch all session questions to get transcripts
+      const questionsData = await sessionService.getSessionQuestions(sessionId);
+      setQuestions(questionsData || []);
     } catch (error) {
-      console.error('Failed to load summary:', error)
+      console.error("Failed to load summary:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const getScoreCategory = (score) => {
-    if (score >= 80) return 'excellent'
-    if (score >= 60) return 'good'
-    return 'needs-work'
-  }
+    if (score >= 80) return "excellent";
+    if (score >= 60) return "good";
+    return "needs-work";
+  };
 
   if (loading) {
     return (
@@ -471,11 +533,11 @@ export default function SessionSummary() {
         <div className="summary-root">
           <div className="loading-container">
             <div className="loader"></div>
-            <p style={{ color: 'var(--text-2)' }}>Loading session summary...</p>
+            <p style={{ color: "var(--text-2)" }}>Loading session summary...</p>
           </div>
         </div>
       </>
-    )
+    );
   }
 
   if (!summary) {
@@ -496,8 +558,8 @@ export default function SessionSummary() {
                 <p className="empty-subtitle">
                   We couldn't find the session summary you're looking for.
                 </p>
-                <button 
-                  onClick={() => navigate('/dashboard')} 
+                <button
+                  onClick={() => navigate("/dashboard")}
                   className="btn-primary"
                 >
                   <ArrowRight size={18} />
@@ -508,7 +570,7 @@ export default function SessionSummary() {
           </div>
         </div>
       </>
-    )
+    );
   }
 
   return (
@@ -525,26 +587,39 @@ export default function SessionSummary() {
               <Award size={40} />
             </div>
             <h1 className="summary-title">Session Complete!</h1>
-            <p className="summary-subtitle">Here's how you performed in your interview session</p>
+            <p className="summary-subtitle">
+              Here's how you performed in your interview session
+            </p>
           </div>
 
           <div className="summary-card">
             <div className="score-grid">
-              <div className={`score-card ${getScoreCategory(summary.overall_score)}`}>
+              <div
+                className={`score-card ${getScoreCategory(summary.overall_score)}`}
+              >
                 <div className="score-value">{summary.overall_score}%</div>
                 <div className="score-label">Overall Score</div>
               </div>
-              <div className={`score-card ${getScoreCategory(summary.technical_score)}`}>
+              <div
+                className={`score-card ${getScoreCategory(summary.technical_score)}`}
+              >
                 <div className="score-value">{summary.technical_score}%</div>
                 <div className="score-label">Technical Skills</div>
               </div>
-              <div className={`score-card ${getScoreCategory(summary.communication_score)}`}>
-                <div className="score-value">{summary.communication_score}%</div>
+              <div
+                className={`score-card ${getScoreCategory(summary.communication_score)}`}
+              >
+                <div className="score-value">
+                  {summary.communication_score}%
+                </div>
                 <div className="score-label">Communication</div>
               </div>
               <div className="score-card">
-                <div className="score-value" style={{ color: 'var(--text-1)', fontSize: '1.5rem' }}>
-                  {summary.duration || '00:00'}
+                <div
+                  className="score-value"
+                  style={{ color: "var(--text-1)", fontSize: "1.5rem" }}
+                >
+                  {summary.duration || "00:00"}
                 </div>
                 <div className="score-label">Duration</div>
               </div>
@@ -582,23 +657,51 @@ export default function SessionSummary() {
               </div>
             )}
 
+            {questions.length > 0 && (
+              <div className="feedback-section">
+                <h3 className="section-title">
+                  <Clock size={20} />
+                  Interview Transcript
+                </h3>
+                <div className="transcript-container">
+                  {questions.map((q, index) => (
+                    <div key={q.id || index} className="transcript-qa">
+                      <div className="question-block">
+                        <h4>
+                          Q{index + 1}: {q.question_text}
+                        </h4>
+                      </div>
+                      {q.transcript && (
+                        <div className="answer-block">
+                          <p>
+                            <strong>Your Answer:</strong>
+                          </p>
+                          <p className="transcript-text">{q.transcript}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="action-buttons">
-              <button 
-                onClick={() => navigate('/interview')} 
+              <button
+                onClick={() => navigate("/interview")}
                 className="btn-primary"
               >
                 Start New Interview
                 <ArrowRight size={18} />
               </button>
-              <button 
-                onClick={() => navigate('/analytics')} 
+              <button
+                onClick={() => navigate("/analytics")}
                 className="btn-secondary"
               >
                 <BarChart size={18} />
                 View Analytics
               </button>
-              <button 
-                onClick={() => navigate('/dashboard')} 
+              <button
+                onClick={() => navigate("/dashboard")}
                 className="btn-secondary"
               >
                 Back to Dashboard
@@ -608,5 +711,5 @@ export default function SessionSummary() {
         </div>
       </div>
     </>
-  )
+  );
 }
