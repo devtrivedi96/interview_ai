@@ -1,6 +1,6 @@
-# Interview AI - Frontend
+# Interviewbit - Frontend
 
-React-based frontend for the Interview AI platform.
+React-based frontend for the Interviewbit platform.
 
 ## Features
 
@@ -25,16 +25,19 @@ React-based frontend for the Interview AI platform.
 ## Setup
 
 1. Install dependencies:
+
 ```bash
 npm install
 ```
 
 2. Configure environment:
+
 ```bash
 cp .env.example .env
 ```
 
 3. Run development server:
+
 ```bash
 npm run dev
 ```

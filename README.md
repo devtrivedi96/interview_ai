@@ -1,4 +1,4 @@
-# Interview AI Platform
+# Interviewbit Platform
 
 An intelligent AI-powered interview preparation system with real-time voice input, speech-to-text transcription, AI-powered question generation, and structured evaluation using AWS Bedrock and Groq APIs.
 

@@ -11,7 +11,7 @@ ENV_FILE = BASE_DIR / ".env"
 
 class Settings(BaseSettings):
     # Application
-    APP_NAME: str = "Interview AI"
+    APP_NAME: str = "Interviewbit"
     DEBUG: bool = True
     ENVIRONMENT: str = "development"
 
@@ -120,7 +120,7 @@ class Settings(BaseSettings):
     # Email
     BREVO_API_KEY: str = ""
     BREVO_SENDER_EMAIL: str = ""
-    BREVO_SENDER_NAME: str = "Interview AI"
+    BREVO_SENDER_NAME: str = "Interviewbit"
     EMAIL_VERIFICATION_REDIRECT_URL: str = "http://localhost:5173/login"
 
     @field_validator("DEBUG", mode="before")

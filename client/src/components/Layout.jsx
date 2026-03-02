@@ -422,9 +422,7 @@ function SidebarContent({ user, onNavClick, onLogout }) {
         <div className="logo-icon">
           <Mic size={16} />
         </div>
-        <span className="logo-text">
-          Interview<span>.</span>AI
-        </span>
+        <span className="logo-text">Interviewbit</span>
       </Link>
 
       <nav className="sidebar-nav">
@@ -510,9 +508,7 @@ export default function Layout() {
                 >
                   <Mic size={15} />
                 </div>
-                <span className="pub-logo-text">
-                  Interview<span>.</span>AI
-                </span>
+                <span className="pub-logo-text">Interviewbit</span>
               </Link>
               <nav className="pub-nav">
                 <Link to="/login" className="pub-login">
@@ -559,7 +555,7 @@ export default function Layout() {
               <div className="topbar-logo-icon">
                 <Mic size={14} />
               </div>
-              <span className="topbar-logo-text">Interview AI</span>
+              <span className="topbar-logo-text">Interviewbit</span>
             </Link>
             <button className="menu-btn" onClick={() => setOpen(true)}>
               <Menu size={18} />

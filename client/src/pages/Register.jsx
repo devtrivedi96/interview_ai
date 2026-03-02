@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
 import { Mic, Mail, CheckCircle, AlertCircle, Sparkles } from "lucide-react";
-import ThemeToggle from '../components/ThemeToggle';
+import ThemeToggle from "../components/ThemeToggle";
 
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
@@ -479,10 +479,10 @@ export default function Register() {
     try {
       await register(email, password, audioConsent);
       setSuccessMessage(
-        "Account created successfully! You can now log in with your credentials."
+        "Account created successfully! You can now log in with your credentials.",
       );
       setShowSuccess(true);
-      
+
       // Auto redirect after 3 seconds
       setTimeout(() => {
         navigate("/login");
@@ -509,7 +509,7 @@ export default function Register() {
               </div>
 
               <h2 className="success-title">Account Created!</h2>
-              <p className="success-subtitle">Welcome to Interview.AI</p>
+              <p className="success-subtitle">Welcome to Interviewbit</p>
 
               <div className="success-email">
                 <Mail size={32} className="success-email-icon" />
@@ -636,8 +636,7 @@ export default function Register() {
 
             <div className="register-footer">
               <p className="login-link">
-                Already have an account?{" "}
-                <Link to="/login">Login</Link>
+                Already have an account? <Link to="/login">Login</Link>
               </p>
               <p className="register-disclaimer">
                 By creating an account, you agree to receive interview session

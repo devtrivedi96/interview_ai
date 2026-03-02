@@ -598,7 +598,7 @@ export default function Home() {
             Ready to ace your interviews?
           </h2>
           <p className="text-primary-100 mb-8 text-lg">
-            Join thousands of candidates practicing with Interview.AI
+            Join thousands of candidates practicing with Interviewbit
           </p>
           {!isAuthenticated && (
             <Link
