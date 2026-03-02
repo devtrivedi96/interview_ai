@@ -127,22 +127,35 @@ class STTService:
             s3_key = f"{settings.AWS_TRANSCRIBE_S3_PREFIX}/{job_id}.{ext}"
 
             # Check file size/content before upload
-            if not audio_content or len(audio_content) == 0:
+            file_size = len(audio_content) if audio_content else 0
+            logger.info(f"Audio file received: Filename={audio_file.filename}, Size={file_size} bytes, Content-Type={audio_file.content_type}")
+            
+            if not audio_content or file_size == 0:
                 logger.error(f"Audio file is empty! Filename: {audio_file.filename}, Content-Length: 0")
-                raise HTTPException(status_code=400, detail="Uploaded audio file is empty.")
-            logger.info(f"Audio file size: {len(audio_content)} bytes, Filename: {audio_file.filename}")
+                raise HTTPException(status_code=400, detail="Uploaded audio file is empty. Please ensure your microphone is working and try again.")
+            
+            # Verify file appears to be valid audio (basic check)
+            if file_size < 1000:  # Less than 1KB is suspiciously small
+                logger.warning(f"Audio file is very small ({file_size} bytes). May be incomplete recording.")
+            
+            logger.info(f"Processing audio file: {s3_key}, Size: {file_size} bytes")
 
             # Upload to S3
             try:
-                self.s3_client.put_object(
+                response = self.s3_client.put_object(
                     Bucket=settings.AWS_TRANSCRIBE_S3_BUCKET,
                     Key=s3_key,
                     Body=audio_content
                 )
-                logger.info(f"Uploaded audio to S3: {s3_key}")
+                logger.info(f"Successfully uploaded audio to S3: {s3_key}, ETag: {response.get('ETag')}")
             except Exception as s3_exc:
-                logger.error(f"Failed to upload audio to S3: {s3_exc}")
-                raise HTTPException(status_code=500, detail=f"Failed to upload audio to S3: {s3_exc}")
+                logger.error(f"Failed to upload audio to S3: {s3_exc}", exc_info=True)
+                # Provide more detailed error message
+                error_msg = str(s3_exc)
+                if "InvalidToken" in error_msg or "token" in error_msg.lower():
+                    raise HTTPException(status_code=500, detail=f"AWS authentication error. Please check your credentials: {s3_exc}")
+                else:
+                    raise HTTPException(status_code=500, detail=f"Failed to upload audio to S3: {s3_exc}")
 
             # Start Transcribe job
             media_uri = f"s3://{settings.AWS_TRANSCRIBE_S3_BUCKET}/{s3_key}"
@@ -154,9 +167,9 @@ class STTService:
                     LanguageCode=settings.STT_AWS_LANGUAGE_CODE,
                     OutputBucketName=settings.AWS_TRANSCRIBE_S3_BUCKET
                 )
-                logger.info(f"Started AWS Transcribe job: {job_id}")
+                logger.info(f"Started AWS Transcribe job: {job_id}, Media URI: {media_uri}")
             except Exception as transcribe_exc:
-                logger.error(f"Failed to start AWS Transcribe job: {transcribe_exc}")
+                logger.error(f"Failed to start AWS Transcribe job: {transcribe_exc}", exc_info=True)
                 raise HTTPException(status_code=500, detail=f"Failed to start AWS Transcribe job: {transcribe_exc}")
 
             # Poll for job completion
@@ -166,19 +179,21 @@ class STTService:
             while True:
                 job = self.transcribe_client.get_transcription_job(TranscriptionJobName=job_id)
                 status = job["TranscriptionJob"]["TranscriptionJobStatus"]
+                logger.info(f"Transcription job {job_id} status: {status}")
+                
                 if status == "COMPLETED":
                     transcript_uri = job["TranscriptionJob"]["Transcript"]["TranscriptFileUri"]
                     import requests
                     fetch_attempts = 3
                     for fetch_try in range(fetch_attempts):
                         try:
-                            logger.info(f"Fetching transcript (attempt {fetch_try+1}) from presigned URL: {transcript_uri}")
-                            response = requests.get(transcript_uri)
+                            logger.info(f"Fetching transcript (attempt {fetch_try+1}) from: {transcript_uri}")
+                            response = requests.get(transcript_uri, timeout=10)
                             logger.info(f"Transcript fetch HTTP status: {response.status_code}")
                             response.raise_for_status()
                             transcript_json = response.json()
                             transcript = transcript_json["results"]["transcripts"][0]["transcript"]
-                            logger.info(f"AWS Transcribe completed: {transcript[:100]}...")
+                            logger.info(f"AWS Transcribe completed successfully: {transcript[:100]}...")
                             return transcript
                         except Exception as fetch_exc:
                             logger.error(f"Failed to fetch transcript from S3 (attempt {fetch_try+1}): {fetch_exc}")
@@ -186,16 +201,19 @@ class STTService:
                                 raise HTTPException(status_code=500, detail=f"Failed to fetch transcript from S3 after {fetch_attempts} attempts: {fetch_exc}")
                             time.sleep(2)
                 elif status == "FAILED":
-                    logger.error(f"AWS Transcribe job failed: {job}")
-                    raise HTTPException(status_code=500, detail="AWS Transcribe job failed")
+                    failure_reason = job["TranscriptionJob"].get("FailureReason", "Unknown reason")
+                    logger.error(f"AWS Transcribe job failed: {failure_reason}")
+                    raise HTTPException(status_code=500, detail=f"AWS Transcribe job failed: {failure_reason}")
+                
                 if time.time() - start_time > timeout:
-                    logger.error("AWS Transcribe job timed out")
-                    raise HTTPException(status_code=500, detail="AWS Transcribe job timed out")
+                    logger.error(f"AWS Transcribe job timed out after {timeout} seconds")
+                    raise HTTPException(status_code=500, detail=f"AWS Transcribe job timed out after {timeout} seconds")
+                
                 time.sleep(poll_interval)
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"AWS Transcribe failed: {e}")
+            logger.error(f"AWS Transcribe failed with unexpected error: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"AWS Transcribe failed: {e}")
     
     def _validate_audio_file(self, audio_file: UploadFile):

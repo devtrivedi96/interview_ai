@@ -6,6 +6,7 @@ import logging
 from datetime import datetime, date
 from typing import Any, Dict, List, Optional
 
+import requests
 from openai import OpenAI
 
 from src.db.models import InterviewMode
@@ -76,10 +77,13 @@ class AIContentGenerator:
             if not self.bedrock_model_id:
                 raise ValueError("Set AWS_BEDROCK_MODEL_ID")
             self.bedrock_client = boto3.client("bedrock-runtime", region_name=region)
+        elif self.provider == "groq":
+            # Groq will be called via fallback chain, no client init required
+            pass
         elif self.provider == "fallback":
             pass
         else:
-            raise ValueError("AI_PROVIDER must be openai or aws_bedrock")
+            raise ValueError("AI_PROVIDER must be openai, groq, aws_bedrock, or fallback")
 
     def generate_mode_cards(self, preferences: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         prompt = (
@@ -198,16 +202,207 @@ class AIContentGenerator:
             content = (response.choices[0].message.content or "{}").strip()
             return json.loads(content)
 
+        if self.provider == "groq":
+            # Primary Groq path
+            try:
+                data = self._fallback_groq_json(prompt)
+                if data is not None:
+                    logger.info("Using groq provider for JSON generation")
+                    return data
+            except Exception as e:
+                logger.warning(
+                    "Groq JSON generation failed, trying fallback providers: %s", e
+                )
+                return self._call_fallback_json(prompt)
+
         if self.provider != "aws_bedrock":
             raise RuntimeError("AI provider unavailable")
 
-        content = self._invoke_bedrock_text("Return valid JSON only, no markdown. " + prompt)
-        cleaned = content.strip()
+        # Primary path: AWS Bedrock JSON generation
+        try:
+            content = self._invoke_bedrock_text(
+                "Return valid JSON only, no markdown. " + prompt
+            )
+            cleaned = content.strip()
+            if cleaned.startswith("```"):
+                cleaned = cleaned.strip("`")
+                if cleaned.lower().startswith("json"):
+                    cleaned = cleaned[4:].strip()
+            return json.loads(cleaned)
+        except Exception as e:
+            logger.warning(
+                "Bedrock JSON generation failed, trying fallback providers: %s",
+                e,
+            )
+            return self._call_fallback_json(prompt)
+
+    def _call_fallback_json(self, prompt: str) -> Any:
+        """Fallback chain: GROQ -> Gemini -> OpenAI (HTTP)"""
+        last_error: Optional[Exception] = None
+        for provider_name, caller in [
+            ("groq", self._fallback_groq_json),
+            ("gemini", self._fallback_gemini_json),
+            ("openai", self._fallback_openai_json_http),
+        ]:
+            try:
+                data = caller(prompt)
+                if data is not None:
+                    logger.info("Using %s provider for JSON generation", provider_name)
+                    return data
+            except Exception as provider_err:
+                last_error = provider_err
+                logger.error(
+                    "%s JSON fallback provider failed: %s",
+                    provider_name,
+                    str(provider_err),
+                )
+
+        if last_error:
+            raise last_error
+        raise RuntimeError("No JSON-capable provider available")
+
+    def _fallback_groq_json(self, prompt: str) -> Optional[Any]:
+        """Generate JSON using GROQ's OpenAI-compatible API.
+
+        Returns None if GROQ is not configured.
+        """
+        api_key = getattr(settings, "GROQ_API_KEY", "")
+        if not api_key:
+            return None
+
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        model = getattr(settings, "GROQ_MODEL", "llama3-8b-8192")
+
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a JSON-only API. Always return a single valid JSON object "
+                        "with no markdown, no prose, and no code fences."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.4,
+            "max_tokens": 800,
+            # Many Groq models support OpenAI-style response_format for JSON output
+            "response_format": {"type": "json_object"},
+        }
+
+        response = requests.post(
+            url, headers=headers, json=payload, timeout=settings.AI_TIMEOUT_SEC
+        )
+        response.raise_for_status()
+        data = response.json()
+        choices = data.get("choices") or []
+        if not choices:
+            return None
+        raw_content = (choices[0]["message"]["content"] or "{}").strip()
+
+        # Be tolerant of minor formatting issues: strip code fences / leading labels
+        cleaned = raw_content
         if cleaned.startswith("```"):
             cleaned = cleaned.strip("`")
             if cleaned.lower().startswith("json"):
                 cleaned = cleaned[4:].strip()
-        return json.loads(cleaned)
+
+        # If the model wrapped JSON in prose, try to extract the first JSON object
+        cleaned = cleaned.strip()
+        if not cleaned.startswith("{"):
+            start = cleaned.find("{")
+            end = cleaned.rfind("}")
+            if start != -1 and end != -1 and end > start:
+                cleaned = cleaned[start : end + 1]
+
+        try:
+            return json.loads(cleaned or "{}")
+        except json.JSONDecodeError as e:
+            logger.warning("Groq returned non-JSON content, skipping: %s", e)
+            return None
+
+    def _fallback_gemini_json(self, prompt: str) -> Optional[Any]:
+        """Generate JSON using Google Gemini.
+
+        Returns None if Gemini is not configured.
+        """
+        api_key = getattr(settings, "GEMINI_API_KEY", "")
+        if not api_key:
+            return None
+
+        model = getattr(settings, "GEMINI_MODEL", "gemini-1.5-flash")
+        url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{model}:generateContent?key={api_key}"
+        )
+
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": "Return valid JSON only."},
+                        {"text": prompt},
+                    ]
+                }
+            ]
+        }
+
+        response = requests.post(
+            url, json=payload, timeout=settings.AI_TIMEOUT_SEC
+        )
+        response.raise_for_status()
+        body = response.json()
+        candidates = body.get("candidates") or []
+        if not candidates:
+            return None
+        content = candidates[0].get("content", {})
+        parts = content.get("parts") or []
+        texts = [p.get("text", "") for p in parts if isinstance(p, dict)]
+        text = "".join(texts).strip() or "{}"
+        return json.loads(text)
+
+    def _fallback_openai_json_http(self, prompt: str) -> Optional[Any]:
+        """Generate JSON using OpenAI's HTTP API directly.
+
+        This is used as a fallback even when the main provider is Bedrock.
+        Returns None if OpenAI is not configured.
+        """
+        api_key = settings.OPENAI_API_KEY
+        if not api_key:
+            return None
+
+        url = "https://api.openai.com/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        model = settings.AI_MODEL or "gpt-4o-mini"
+
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "Return valid JSON only."},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.4,
+            "max_tokens": 800,
+        }
+
+        response = requests.post(
+            url, headers=headers, json=payload, timeout=settings.AI_TIMEOUT_SEC
+        )
+        response.raise_for_status()
+        data = response.json()
+        choices = data.get("choices") or []
+        if not choices:
+            return None
+        content = (choices[0]["message"]["content"] or "{}").strip()
+        return json.loads(content)
 
     def _invoke_bedrock_text(self, prompt: str) -> str:
         model_id = self.bedrock_model_id

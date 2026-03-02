@@ -42,17 +42,28 @@ class Settings(BaseSettings):
     # CORS
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
 
-    # OpenAI
-    AI_PROVIDER: str = "openai"  # openai | aws_bedrock
+    # LLM Provider (default to AWS Bedrock to match current infra)
+    AI_PROVIDER: str = "aws_bedrock"  # aws_bedrock | openai | groq
     OPENAI_API_KEY: str = ""
     AI_MODEL: str = "gpt-4"
     AI_TEMPERATURE: float = 0.3
     AI_MAX_RETRIES: int = 2
     AI_TIMEOUT_SEC: int = 30
 
-    # AWS Bedrock
-    AWS_BEDROCK_REGION: str = ""
-    AWS_BEDROCK_MODEL_ID: str = ""
+    # Additional LLM providers for fallback
+    GROQ_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""
+    # Default Groq chat model; can be overridden via env GROQ_MODEL
+    GROQ_MODEL: str = "llama-3.1-8b-instant"
+    # Default Gemini chat model; can be overridden via env GEMINI_MODEL
+    GEMINI_MODEL: str = "gemini-1.5-flash"
+
+    # OpenAI embeddings model (for future use in vector search etc.)
+    OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
+
+    # AWS Bedrock (defaults tuned to Claude 3 Haiku in us-east-1)
+    AWS_BEDROCK_REGION: str = "us-east-1"
+    AWS_BEDROCK_MODEL_ID: str = "anthropic.claude-3-haiku-20240307-v1:0"
     AWS_BEDROCK_MAX_TOKENS: int = 1000
     AWS_BEARER_TOKEN_BEDROCK: str = ""
 
@@ -82,7 +93,7 @@ class Settings(BaseSettings):
     # Session Settings
     DEFAULT_SESSION_DURATION_MIN: int = 30
     MIN_QUESTIONS_PER_SESSION: int = 3
-    MAX_QUESTIONS_PER_SESSION: int = 10
+    MAX_QUESTIONS_PER_SESSION: int = 50
 
     # Evaluation
     MIN_EVAL_CONFIDENCE: float = 0.5

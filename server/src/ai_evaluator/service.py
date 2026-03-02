@@ -1,11 +1,12 @@
-"""
-AI Evaluator Service
-LLM-based answer evaluation with rubric scoring
+"""AI Evaluator Service
+LLM-based answer evaluation with rubric scoring.
 """
 import json
 import logging
-from typing import Dict
+from typing import Dict, Optional
 import asyncio
+
+import requests
 from openai import AsyncOpenAI
 import jsonschema
 
@@ -42,8 +43,11 @@ class AIEvaluatorService:
             if not self.bedrock_model_id:
                 raise ValueError("Set AWS_BEDROCK_MODEL_ID for Bedrock")
             self.bedrock_client = boto3.client("bedrock-runtime", region_name=region)
+        elif self.provider == "groq":
+            # Groq will be called via fallback chain if needed, no client init required
+            pass
         else:
-            raise ValueError("Unsupported AI_PROVIDER. Use 'openai' or 'aws_bedrock'.")
+            raise ValueError("Unsupported AI_PROVIDER. Use 'openai', 'groq', or 'aws_bedrock'.")
 
         self.schema = self._load_schema()
     
@@ -113,31 +117,79 @@ class AIEvaluatorService:
         return evaluation
     
     async def _call_llm(self, prompt: str) -> str:
-        """Call LLM API with timeout"""
-        if self.provider == "aws_bedrock":
-            return await self._call_bedrock(prompt)
+        """Call primary LLM provider with timeout, then fall back to others.
 
+        Primary provider is controlled by AI_PROVIDER (openai, groq, or aws_bedrock).
+        On failure, we fall back through the chain.
+        """
+        if self.provider == "aws_bedrock":
+            try:
+                return await self._call_bedrock(prompt)
+            except Exception as e:
+                logger.error(f"Bedrock evaluation call failed, trying fallbacks: {e}")
+                return await self._call_fallback_llm(prompt)
+        
+        elif self.provider == "groq":
+            try:
+                return await self._call_groq_json(prompt)
+            except Exception as e:
+                logger.error(f"Groq evaluation call failed, trying fallbacks: {e}")
+                return await self._call_fallback_llm(prompt)
+
+        # Primary OpenAI client path (provider == "openai")
         try:
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an expert interview evaluator. Always respond with valid JSON matching the required schema."
+                        "content": (
+                            "You are an expert interview evaluator. "
+                            "Always respond with valid JSON matching the required schema."
+                        ),
                     },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
+                    {"role": "user", "content": prompt},
                 ],
                 temperature=settings.AI_TEMPERATURE,
                 response_format={"type": "json_object"},
-                timeout=settings.AI_TIMEOUT_SEC
+                timeout=settings.AI_TIMEOUT_SEC,
             )
             return response.choices[0].message.content
         except Exception as e:
-            logger.error(f"LLM API call failed: {e}")
-            raise
+            logger.error(f"OpenAI evaluation call failed, trying fallbacks: {e}")
+            return await self._call_fallback_llm(prompt)
+
+    async def _call_fallback_llm(self, prompt: str) -> str:
+        """Fallback chain: Groq -> Gemini -> OpenAI HTTP.
+
+        Returns raw JSON string from the first provider that succeeds.
+        Raises the last error if all providers fail.
+        """
+        last_error: Optional[Exception] = None
+
+        for provider_name, caller in [
+            ("groq", self._call_groq_json),
+            ("gemini", self._call_gemini_json),
+            ("openai", self._call_openai_http_json),
+        ]:
+            try:
+                content = await caller(prompt)
+                if content:
+                    logger.info(
+                        "Using %s fallback provider for evaluation JSON", provider_name
+                    )
+                    return content
+            except Exception as provider_err:
+                last_error = provider_err
+                logger.error(
+                    "%s evaluation provider failed: %s",
+                    provider_name,
+                    str(provider_err),
+                )
+
+        if last_error:
+            raise last_error
+        raise RuntimeError("No evaluation provider available")
 
     async def _call_bedrock(self, prompt: str) -> str:
         """Call AWS Bedrock model."""
@@ -202,6 +254,150 @@ class AIEvaluatorService:
         raise ValueError(
             "Unsupported Bedrock model family. Use Anthropic Claude or Amazon Titan model ids."
         )
+
+    async def _call_groq_json(self, prompt: str) -> str:
+        """Call Groq's OpenAI-compatible API to get JSON evaluation."""
+        api_key = getattr(settings, "GROQ_API_KEY", "")
+        if not api_key:
+            return ""
+
+        return await asyncio.to_thread(self._invoke_groq_json, prompt)
+
+    def _invoke_groq_json(self, prompt: str) -> str:
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {getattr(settings, 'GROQ_API_KEY', '')}",
+            "Content-Type": "application/json",
+        }
+        model = getattr(settings, "GROQ_MODEL", "llama-3.1-8b-instant")
+
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an expert interview evaluator. "
+                        "Always return a single valid JSON object only, "
+                        "no markdown, no prose, no code fences."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": settings.AI_TEMPERATURE,
+            "max_tokens": settings.AWS_BEDROCK_MAX_TOKENS,
+            "response_format": {"type": "json_object"},
+        }
+
+        response = requests.post(
+            url,
+            headers=headers,
+            json=payload,
+            timeout=settings.AI_TIMEOUT_SEC,
+        )
+        response.raise_for_status()
+        data = response.json()
+        choices = data.get("choices") or []
+        if not choices:
+            return ""
+        content = (choices[0]["message"]["content"] or "").strip()
+        return content
+
+    async def _call_gemini_json(self, prompt: str) -> str:
+        """Call Google Gemini to get JSON evaluation."""
+        api_key = getattr(settings, "GEMINI_API_KEY", "")
+        if not api_key:
+            return ""
+
+        return await asyncio.to_thread(self._invoke_gemini_json, prompt)
+
+    def _invoke_gemini_json(self, prompt: str) -> str:
+        model = getattr(settings, "GEMINI_MODEL", "gemini-1.5-flash")
+        url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{model}:generateContent?key={getattr(settings, 'GEMINI_API_KEY', '')}"
+        )
+
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {
+                            "text": (
+                                "You are an expert interview evaluator. "
+                                "Return a single valid JSON object only."
+                            )
+                        },
+                        {"text": prompt},
+                    ]
+                }
+            ]
+        }
+
+        response = requests.post(
+            url,
+            json=payload,
+            timeout=settings.AI_TIMEOUT_SEC,
+        )
+        response.raise_for_status()
+        body = response.json()
+        candidates = body.get("candidates") or []
+        if not candidates:
+            return ""
+        content = candidates[0].get("content", {})
+        parts = content.get("parts") or []
+        texts = [p.get("text", "") for p in parts if isinstance(p, dict)]
+        return "".join(texts).strip()
+
+    async def _call_openai_http_json(self, prompt: str) -> str:
+        """Call OpenAI HTTP API directly to get JSON evaluation.
+
+        Used as a fallback even when the main provider is Bedrock.
+        """
+        api_key = settings.OPENAI_API_KEY
+        if not api_key:
+            return ""
+
+        return await asyncio.to_thread(self._invoke_openai_http_json, prompt)
+
+    def _invoke_openai_http_json(self, prompt: str) -> str:
+        url = "https://api.openai.com/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {settings.OPENAI_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        model = settings.AI_MODEL or "gpt-4o-mini"
+
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an expert interview evaluator. "
+                        "Always return a single valid JSON object only."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": settings.AI_TEMPERATURE,
+            "max_tokens": settings.AWS_BEDROCK_MAX_TOKENS,
+            "response_format": {"type": "json_object"},
+        }
+
+        response = requests.post(
+            url,
+            headers=headers,
+            json=payload,
+            timeout=settings.AI_TIMEOUT_SEC,
+        )
+        response.raise_for_status()
+        data = response.json()
+        choices = data.get("choices") or []
+        if not choices:
+            return ""
+        content = (choices[0]["message"]["content"] or "").strip()
+        return content
     
     def _parse_and_validate(self, response: str) -> Dict:
         """Parse and validate LLM response against schema"""
@@ -235,13 +431,13 @@ class AIEvaluatorService:
         """Fallback evaluation when LLM fails"""
         return {
             "scores": {
-                "dimension_1": 3.0,
-                "dimension_2": 3.0,
-                "dimension_3": 3.0,
-                "dimension_4": 3.0,
-                "dimension_5": 3.0
+                "dimension_1": 2.0,
+                "dimension_2": 2.0,
+                "dimension_3": 2.0,
+                "dimension_4": 2.0,
+                "dimension_5": 2.0
             },
-            "composite_score": 3.0,
+            "composite_score": 2.0,
             "strengths": ["Attempted the question"],
             "improvements": ["Evaluation service temporarily unavailable - please try again"],
             "next_question_strategy": "same",
