@@ -101,9 +101,13 @@ async def get_insights(
     scores_over_time = []
     all_strengths = []
     all_improvements = []
+    session_ids = []
+    question_ids = []
     
+    # First pass: collect session scores and IDs (avoids N+1 queries)
     for session_doc in sessions:
         session = InterviewSession.from_dict(session_doc.id, session_doc.to_dict())
+        session_ids.append(session.id)
         
         if session.total_score is not None:
             scores_over_time.append({
@@ -111,22 +115,32 @@ async def get_insights(
                 "score": session.total_score,
                 "mode": session.mode.value
             })
+    
+    # Second pass: fetch all session questions for these sessions
+    if session_ids:
+        question_docs_raw = list(db.collection(Collections.SESSION_QUESTIONS).get())
+        question_docs = [q for q in question_docs_raw if q.to_dict().get('session_id') in session_ids]
+        question_ids = [q.id for q in question_docs]
+    
+    # Third pass: fetch all evaluations for these questions
+    if question_ids:
+        eval_docs_raw = list(db.collection(Collections.EVALUATIONS).get())
+        all_evaluations = [e for e in eval_docs_raw if e.to_dict().get('session_question_id') in question_ids]
         
-        # Get evaluations for this session
-        questions = db.collection(Collections.SESSION_QUESTIONS)\
-            .where('session_id', '==', session.id)\
-            .get()
-        
-        for q_doc in questions:
-            evals = db.collection(Collections.EVALUATIONS)\
-                .where('session_question_id', '==', q_doc.id)\
-                .limit(1)\
-                .get()
+        for e_doc in all_evaluations:
+            eval_data = e_doc.to_dict()
+            strengths = eval_data.get('strengths', []) or []
+            improvements = eval_data.get('improvements', []) or []
             
-            for e_doc in evals:
-                eval_data = e_doc.to_dict()
-                all_strengths.extend(eval_data.get('strengths', []))
-                all_improvements.extend(eval_data.get('improvements', []))
+            # Filter out error messages and fallback placeholder text
+            all_strengths.extend([
+                s for s in strengths 
+                if s and "Answer recorded successfully" not in s and "temporarily unavailable" not in s
+            ])
+            all_improvements.extend([
+                i for i in improvements 
+                if i and "temporarily unavailable" not in i and "please try again" not in i
+            ])
     
     # Calculate trend
     trend = "stable"

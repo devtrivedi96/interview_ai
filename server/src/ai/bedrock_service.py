@@ -2,12 +2,28 @@ import boto3
 import json
 import logging
 from typing import Optional
+import time
+from functools import lru_cache
 
 import requests
 
 from src.utils.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Global rate limiter state for GROQ API
+_groq_last_request_time = 0
+_groq_request_count = 0
+_groq_rate_limit_window_start = 0
+GROQ_MIN_INTERVAL_SEC = getattr(settings, 'GROQ_MIN_INTERVAL_SEC', 1.0)
+GROQ_MAX_REQUESTS_PER_MINUTE = getattr(settings, 'GROQ_MAX_REQUESTS_PER_MINUTE', 60)
+
+# Global rate limiter state for Gemini API
+_gemini_last_request_time = 0
+_gemini_request_count = 0
+_gemini_rate_limit_window_start = 0
+GEMINI_MIN_INTERVAL_SEC = getattr(settings, 'GEMINI_MIN_INTERVAL_SEC', 1.0)
+GEMINI_MAX_REQUESTS_PER_MINUTE = getattr(settings, 'GEMINI_MAX_REQUESTS_PER_MINUTE', 60)
 
 
 class BedrockService:
@@ -184,12 +200,30 @@ Difficulty Level: {difficulty} (1=easy, 5=very hard)
     def _fallback_groq(self, prompt: str) -> Optional[str]:
         """Try generating a question using GROQ's OpenAI-compatible API.
 
-        Returns None if GROQ is not configured or if the call fails.
+        Implements rate limiting to avoid overwhelming GROQ API.
+        Returns None if GROQ is not configured, rate limited, or fails.
         """
+        global _groq_last_request_time, _groq_request_count, _groq_rate_limit_window_start
+        
         api_key = getattr(settings, "GROQ_API_KEY", "")
         if not api_key:
             return None
 
+        # Rate limiting: enforce minimum interval between requests
+        current_time = time.time()
+        if current_time - _groq_last_request_time < GROQ_MIN_INTERVAL_SEC:
+            logger.warning(f"GROQ rate limit: too many requests. Waiting {GROQ_MIN_INTERVAL_SEC}s between calls")
+            return None
+        
+        # Check per-minute rate limit
+        if current_time - _groq_rate_limit_window_start > 60:
+            _groq_request_count = 0
+            _groq_rate_limit_window_start = current_time
+        
+        if _groq_request_count >= GROQ_MAX_REQUESTS_PER_MINUTE:
+            logger.warning(f"GROQ rate limit: {GROQ_MAX_REQUESTS_PER_MINUTE} requests/min exceeded")
+            return None
+        
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -209,26 +243,53 @@ Difficulty Level: {difficulty} (1=easy, 5=very hard)
             "max_tokens": 300,
         }
 
-        response = requests.post(
-            url,
-            headers=headers,
-            json=payload,
-            timeout=settings.AI_TIMEOUT_SEC,
-        )
-        response.raise_for_status()
-        data = response.json()
-        choices = data.get("choices") or []
-        if not choices:
+        try:
+            response = requests.post(
+                url,
+                headers=headers,
+                json=payload,
+                timeout=settings.AI_TIMEOUT_SEC,
+            )
+            response.raise_for_status()
+            
+            # Update rate limit tracking
+            _groq_last_request_time = current_time
+            _groq_request_count += 1
+            
+            data = response.json()
+            choices = data.get("choices") or []
+            if not choices:
+                return None
+            return choices[0]["message"]["content"]
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"GROQ API error: {e}")
             return None
-        return choices[0]["message"]["content"]
 
     def _fallback_gemini(self, prompt: str) -> Optional[str]:
         """Try generating a question using Google Gemini.
 
-        Returns None if Gemini is not configured or if the call fails.
+        Implements rate limiting to avoid overwhelming Gemini API.
+        Returns None if Gemini is not configured, rate limited, or fails.
         """
+        global _gemini_last_request_time, _gemini_request_count, _gemini_rate_limit_window_start
+        
         api_key = getattr(settings, "GEMINI_API_KEY", "")
         if not api_key:
+            return None
+
+        # Rate limiting: enforce minimum interval between requests
+        current_time = time.time()
+        if current_time - _gemini_last_request_time < GEMINI_MIN_INTERVAL_SEC:
+            logger.warning(f"Gemini rate limit: too many requests. Waiting {GEMINI_MIN_INTERVAL_SEC}s between calls")
+            return None
+        
+        # Check per-minute rate limit
+        if current_time - _gemini_rate_limit_window_start > 60:
+            _gemini_request_count = 0
+            _gemini_rate_limit_window_start = current_time
+        
+        if _gemini_request_count >= GEMINI_MAX_REQUESTS_PER_MINUTE:
+            logger.warning(f"Gemini rate limit: {GEMINI_MAX_REQUESTS_PER_MINUTE} requests/min exceeded")
             return None
 
         model = getattr(settings, "GEMINI_MODEL", "gemini-1.5-flash")
@@ -247,11 +308,30 @@ Difficulty Level: {difficulty} (1=easy, 5=very hard)
             ]
         }
 
-        response = requests.post(
-            url,
-            json=payload,
-            timeout=settings.AI_TIMEOUT_SEC,
-        )
+        try:
+            response = requests.post(
+                url,
+                json=payload,
+                timeout=settings.AI_TIMEOUT_SEC,
+            )
+            response.raise_for_status()
+            
+            # Update rate limit tracking
+            _gemini_last_request_time = current_time
+            _gemini_request_count += 1
+            
+            data = response.json()
+            candidates = data.get("candidates") or []
+            if not candidates:
+                return None
+            content = candidates[0].get("content", {})
+            parts = content.get("parts") or []
+            if not parts:
+                return None
+            return parts[0].get("text")
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Gemini API error: {e}")
+            return None
         response.raise_for_status()
         data = response.json()
         candidates = data.get("candidates") or []

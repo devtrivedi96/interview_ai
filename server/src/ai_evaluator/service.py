@@ -439,7 +439,7 @@ class AIEvaluatorService:
             },
             "composite_score": 2.0,
             "strengths": ["Attempted the question"],
-            "improvements": ["Evaluation service temporarily unavailable - please try again"],
+            "improvements": [],
             "next_question_strategy": "same",
             "eval_confidence": 0.3
         }

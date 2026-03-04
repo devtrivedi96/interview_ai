@@ -8,8 +8,6 @@ import {
   Shield,
   ArrowRight,
   CheckCircle,
-  Moon,
-  Sun,
 } from "lucide-react";
 
 export default function Home() {
@@ -22,13 +20,6 @@ export default function Home() {
     document.documentElement.setAttribute("data-theme", savedTheme);
   }, []);
 
-  const toggleTheme = () => {
-    const newTheme = theme === "dark" ? "light" : "dark";
-    setTheme(newTheme);
-    document.documentElement.setAttribute("data-theme", newTheme);
-    localStorage.setItem("app-theme", newTheme);
-  };
-
   return (
     <div
       style={{
@@ -39,35 +30,6 @@ export default function Home() {
         transition: "all 0.3s ease",
       }}
     >
-      {/* Theme Toggle */}
-      <button
-        onClick={toggleTheme}
-        style={{
-          position: "fixed",
-          top: "20px",
-          right: "20px",
-          width: "48px",
-          height: "48px",
-          borderRadius: "50%",
-          background: "var(--surface)",
-          border: "2px solid var(--border)",
-          color: "var(--accent)",
-          boxShadow: "var(--shadow-md)",
-          zIndex: 100,
-          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-        }}
-        className="flex items-center justify-center cursor-pointer hover:scale-110 hover:rotate-180"
-        onMouseEnter={(e) => {
-          e.currentTarget.style.boxShadow =
-            "var(--shadow-md), 0 0 20px var(--accent-glow)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.boxShadow = "var(--shadow-md)";
-        }}
-      >
-        {theme === "dark" ? <Sun size={22} /> : <Moon size={22} />}
-      </button>
-
       {/* Hero Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="text-center animate-fade-in">

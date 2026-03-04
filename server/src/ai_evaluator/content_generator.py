@@ -187,6 +187,63 @@ class AIContentGenerator:
             ]
         }
 
+    def generate_concept_learning(self, concept: str) -> Dict[str, Any]:
+        """Generate detailed learning material for a concept including definition, 
+        explanation, examples, and interview questions with answers."""
+        prompt = (
+            f"Generate comprehensive learning material for '{concept}' as JSON with keys: "
+            "'definition' (1-2 sentences), 'explanation' (detailed 3-5 paragraph explanation), "
+            "'key_points' (array of 4-6 important points), 'examples' (array of 2-3 real-world examples), "
+            "'interview_questions' (array of 3-4 realistic interview questions with the 'question' and 'answer' key). "
+            "Make content detailed, professional, and suitable for interview preparation. "
+            "Return valid JSON only."
+        )
+
+        try:
+            data = self._generate_json(prompt)
+            if isinstance(data, dict):
+                # Ensure required fields exist
+                required_fields = ["definition", "explanation", "key_points", "examples", "interview_questions"]
+                for field in required_fields:
+                    if field not in data:
+                        data[field] = self._fallback_concept_learning().get(field, [])
+                return data
+        except Exception as e:
+            logger.warning(f"AI concept learning generation failed, using fallback: {e}")
+
+        return self._fallback_concept_learning()
+
+    def generate_suggested_topics(
+        self, 
+        experience_level: str = "intermediate",
+        preferred_roles: Optional[List[str]] = None,
+        tech_stack: Optional[List[str]] = None
+    ) -> List[Dict[str, str]]:
+        """Generate AI-suggested topics for preparation based on user profile."""
+        prompt = (
+            "Generate 5-7 interview preparation topics as JSON array. "
+            "Each topic has 'name' and 'description' (max 80 chars). "
+            f"Experience level: {experience_level}. "
+        )
+        if preferred_roles:
+            prompt += f"Target roles: {', '.join(preferred_roles)}. "
+        if tech_stack:
+            prompt += f"Tech stack: {', '.join(tech_stack)}. "
+
+        prompt += (
+            "Focus on practical, relevant topics. Return valid JSON array only."
+        )
+
+        try:
+            data = self._generate_json(prompt)
+            topics = data if isinstance(data, list) else data.get("topics", [])
+            if isinstance(topics, list) and len(topics) > 0:
+                return topics[:7]
+        except Exception as e:
+            logger.warning(f"AI topic suggestion failed, using fallback: {e}")
+
+        return self._fallback_suggested_topics(preferred_roles, tech_stack)
+
     def _generate_json(self, prompt: str) -> Any:
         if self.provider == "openai":
             response = self.openai_client.chat.completions.create(
@@ -488,3 +545,89 @@ class AIContentGenerator:
             4: "How do you prioritize when everything is urgent?",
             5: "Describe influencing without authority.",
         }.get(difficulty, "Describe a behavioral scenario you handled well.")
+
+    @staticmethod
+    def _fallback_concept_learning() -> Dict[str, Any]:
+        """Fallback learning material when AI is unavailable."""
+        return {
+            "definition": "A fundamental concept in software development and system design.",
+            "explanation": "This is a core concept that requires understanding at both theoretical and practical levels. "
+                          "It involves learning foundational principles, understanding how different components interact, "
+                          "and being able to apply this knowledge to solve real-world problems. Study the basics thoroughly, "
+                          "practice with examples, and then focus on advanced use cases.",
+            "key_points": [
+                "Understand the core principles and fundamentals",
+                "Learn how this concept is applied in real-world systems",
+                "Practice with multiple examples and scenarios",
+                "Focus on edge cases and potential pitfalls",
+                "Understand trade-offs and when to apply this concept",
+                "Study best practices and common patterns"
+            ],
+            "examples": [
+                "Real-world application example 1: How this concept is used in production systems",
+                "Real-world application example 2: A common use case you might encounter in interviews",
+                "Real-world application example 3: Advanced application demonstrating deeper understanding"
+            ],
+            "interview_questions": [
+                {
+                    "question": "Can you explain this concept and its importance?",
+                    "answer": "This concept is important because it forms the foundation for scalable and efficient systems. "
+                             "For example, understanding this allows you to make better architectural decisions."
+                },
+                {
+                    "question": "What are the key trade-offs you should consider?",
+                    "answer": "When deciding to use this approach, consider performance vs complexity and maintainability. "
+                             "The best choice depends on your specific system requirements."
+                },
+                {
+                    "question": "How would you implement or use this in a real system?",
+                    "answer": "In production systems, you implement this by... focusing on the core requirements and gradually "
+                             "optimizing based on actual performance metrics."
+                },
+                {
+                    "question": "What's a common mistake people make with this concept?",
+                    "answer": "A common mistake is over-engineering or under-engineering the solution without understanding "
+                             "the actual requirements. Always measure and optimize based on real data."
+                }
+            ]
+        }
+
+    @staticmethod
+    def _fallback_suggested_topics(
+        preferred_roles: Optional[List[str]] = None,
+        tech_stack: Optional[List[str]] = None
+    ) -> List[Dict[str, str]]:
+        """Fallback suggested topics when AI is unavailable."""
+        default_topics = [
+            {"name": "Data Structures", "description": "Arrays, Linked Lists, Trees, Graphs, Hash Tables - Fundamental building blocks"},
+            {"name": "Algorithms & Complexity", "description": "Sorting, Searching, DP, Time/Space complexity analysis"},
+            {"name": "System Design", "description": "Scalability, Load Balancing, Caching, Databases - Large-scale design"},
+            {"name": "Object-Oriented Design", "description": "SOLID principles, Design Patterns, OOP concepts"},
+            {"name": "Database Design", "description": "SQL, NoSQL, Indexing, Transactions, Optimization"},
+            {"name": "Communication & Soft Skills", "description": "STAR method, Teamwork, Conflict resolution, Leadership"},
+        ]
+        
+        if preferred_roles and isinstance(preferred_roles, list):
+            roles_str = " ".join(preferred_roles).lower()
+            if "frontend" in roles_str or "full" in roles_str:
+                default_topics.extend([
+                    {"name": "Frontend Frameworks", "description": "React/Vue/Angular - Components, State, Hooks"},
+                    {"name": "Web Performance", "description": "Rendering optimization, Network optimization, Caching"},
+                ])
+            if "backend" in roles_str or "full" in roles_str:
+                default_topics.extend([
+                    {"name": "REST APIs & Microservices", "description": "API design, Microservices architecture, Best practices"},
+                ])
+        
+        if tech_stack and isinstance(tech_stack, list):
+            tech_str = " ".join(tech_stack).lower()
+            if "aws" in tech_str:
+                default_topics.append(
+                    {"name": "AWS Services", "description": "EC2, S3, Lambda, RDS, DynamoDB - Core AWS essentials"}
+                )
+            if "docker" in tech_str or "kubernetes" in tech_str:
+                default_topics.append(
+                    {"name": "Containerization & Orchestration", "description": "Docker, Kubernetes - Container basics and deployment"}
+                )
+        
+        return default_topics[:7]

@@ -20,7 +20,6 @@ import {
   Target,
   Sparkles,
 } from "lucide-react";
-import ThemeToggle from "../components/ThemeToggle";
 
 const STYLE = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
@@ -412,20 +411,15 @@ export default function Analytics() {
               </h1>
               <p className="an-subtitle">Track your growth over time</p>
             </div>
-            <div
-              style={{ display: "flex", alignItems: "flex-end", gap: "16px" }}
+            <select
+              className="an-period-select"
+              value={days}
+              onChange={(e) => setDays(Number(e.target.value))}
             >
-              <select
-                className="an-period-select"
-                value={days}
-                onChange={(e) => setDays(Number(e.target.value))}
-              >
-                <option value={7}>Last 7 days</option>
-                <option value={30}>Last 30 days</option>
-                <option value={90}>Last 90 days</option>
-              </select>
-              <ThemeToggle />
-            </div>
+              <option value={7}>Last 7 days</option>
+              <option value={30}>Last 30 days</option>
+              <option value={90}>Last 90 days</option>
+            </select>
           </div>
         </div>
 

@@ -10,8 +10,6 @@ import {
   AlertCircle,
   ArrowRight,
   Sparkles,
-  Moon,
-  Sun,
 } from "lucide-react";
 
 const STYLE = `
@@ -985,17 +983,10 @@ export default function Interview() {
   useEffect(() => {
     loadNextQuestion();
     // Load theme from localStorage
-    const savedTheme = localStorage.getItem("interview-theme") || "dark";
+    const savedTheme = localStorage.getItem("app-theme") || "dark";
     setTheme(savedTheme);
     document.documentElement.setAttribute("data-theme", savedTheme);
   }, []);
-
-  const toggleTheme = () => {
-    const newTheme = theme === "dark" ? "light" : "dark";
-    setTheme(newTheme);
-    document.documentElement.setAttribute("data-theme", newTheme);
-    localStorage.setItem("interview-theme", newTheme);
-  };
 
   const showError = (message) => {
     setError(message);
@@ -1296,10 +1287,10 @@ export default function Interview() {
   const handleComplete = async () => {
     try {
       await sessionService.completeSession(sessionId);
+      navigate("/dashboard");
     } catch (err) {
       console.error(err);
     }
-    await fetchSummary();
   };
 
   const dimensionScores = deriveDimensionScores(evaluation);
@@ -1372,14 +1363,6 @@ export default function Interview() {
       <>
         <style>{STYLE}</style>
         <div className="iv-root">
-          <button
-            className="iv-theme-toggle"
-            onClick={toggleTheme}
-            aria-label="Toggle theme"
-          >
-            {theme === "dark" ? <Sun size={22} /> : <Moon size={22} />}
-          </button>
-
           <div className="iv-header">
             <h1 className="iv-q-label">Final Analysis</h1>
             <div className="iv-badges">
@@ -1469,15 +1452,6 @@ export default function Interview() {
     <>
       <style>{STYLE}</style>
       <div className="iv-root">
-        {/* Theme Toggle */}
-        <button
-          className="iv-theme-toggle"
-          onClick={toggleTheme}
-          aria-label="Toggle theme"
-        >
-          {theme === "dark" ? <Sun size={22} /> : <Moon size={22} />}
-        </button>
-
         {/* Header */}
         {question && (
           <div className="iv-header">

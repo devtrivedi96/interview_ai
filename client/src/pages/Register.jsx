@@ -1,7 +1,15 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
-import { Mic, Mail, CheckCircle, AlertCircle, Sparkles } from "lucide-react";
+import {
+  Mic,
+  Mail,
+  CheckCircle,
+  AlertCircle,
+  Sparkles,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import ThemeToggle from "../components/ThemeToggle";
 
 const STYLES = `
@@ -145,6 +153,49 @@ const STYLES = `
   .input-hint {
     font-size: 12px;
     color: var(--text-3);
+  }
+
+  .input-error {
+    font-size: 12px;
+    color: #dc2626;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .input-field.error-border {
+    border-color: #dc2626;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+  }
+
+  .input-password-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .input-password-wrapper input {
+    width: 100%;
+    padding-right: 45px;
+  }
+
+  .password-toggle-btn {
+    position: absolute;
+    right: 15px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    transition: color 0.2s ease;
+  }
+
+  .password-toggle-btn:hover {
+    color: var(--accent);
   }
 
   .consent-panel {
@@ -462,6 +513,9 @@ const STYLES = `
 export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [audioConsent, setAudioConsent] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -471,9 +525,38 @@ export default function Register() {
   const { register } = useAuthStore();
   const navigate = useNavigate();
 
+  const validateForm = () => {
+    if (!email) {
+      setError("Email is required");
+      return false;
+    }
+    if (!password || password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return false;
+    }
+    if (!confirmPassword) {
+      setError("Please confirm your password");
+      return false;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return false;
+    }
+    if (!audioConsent) {
+      setError("You must consent to audio recording to proceed");
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    if (!validateForm()) {
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -535,6 +618,10 @@ export default function Register() {
                     setShowSuccess(false);
                     setEmail("");
                     setPassword("");
+                    setConfirmPassword("");
+                    setShowPassword(false);
+                    setShowConfirmPassword(false);
+                    setAudioConsent(false);
                   }}
                   className="btn-secondary"
                 >
@@ -587,16 +674,66 @@ export default function Register() {
 
               <div className="input-group">
                 <label className="input-label">Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="input-field"
-                  required
-                  placeholder="••••••••"
-                  minLength={6}
-                />
+                <div className="input-password-wrapper">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="input-field"
+                    required
+                    placeholder="••••••••"
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="password-toggle-btn"
+                    tabIndex="-1"
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
                 <span className="input-hint">Minimum 6 characters</span>
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Confirm Password</label>
+                <div className="input-password-wrapper">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className={`input-field ${
+                      confirmPassword && password !== confirmPassword
+                        ? "error-border"
+                        : ""
+                    }`}
+                    required
+                    placeholder="••••••••"
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="password-toggle-btn"
+                    tabIndex="-1"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff size={20} />
+                    ) : (
+                      <Eye size={20} />
+                    )}
+                  </button>
+                </div>
+                {confirmPassword && password !== confirmPassword && (
+                  <div className="input-error">
+                    <AlertCircle size={16} />
+                    Passwords do not match
+                  </div>
+                )}
+                {!confirmPassword && (
+                  <span className="input-hint">Re-enter your password</span>
+                )}
               </div>
 
               <div className="consent-panel">
@@ -606,11 +743,12 @@ export default function Register() {
                     id="audioConsent"
                     checked={audioConsent}
                     onChange={(e) => setAudioConsent(e.target.checked)}
+                    required
                   />
                   <label htmlFor="audioConsent" className="consent-label">
-                    <strong>Audio Recording Consent:</strong> I consent to audio
-                    recording for interview practice. Audio will be retained for
-                    30 days and used only for evaluation purposes.
+                    <strong>Audio Recording Consent:*</strong> I consent to
+                    audio recording for interview practice. Audio will be
+                    retained for 30 days and used only for evaluation purposes.
                   </label>
                 </div>
               </div>
@@ -627,7 +765,14 @@ export default function Register() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={
+                  loading ||
+                  !audioConsent ||
+                  !email ||
+                  !password ||
+                  !confirmPassword ||
+                  password !== confirmPassword
+                }
                 className="register-button"
               >
                 {loading ? "Creating account..." : "Create Account"}

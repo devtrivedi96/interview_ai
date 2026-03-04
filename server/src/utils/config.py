@@ -42,9 +42,9 @@ class Settings(BaseSettings):
     # CORS
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
+        "http://localhost:3001",
         "http://localhost:5173",
-        "https://interview-ooujiwzy7-dev-trivedis-projects.vercel.app",
-        "https://*.vercel.app"
+        "https://interview-ooujiwzy7-dev-trivedis-projects.vercel.app"
     ]
 
     # LLM Provider (default to AWS Bedrock to match current infra)
@@ -66,9 +66,9 @@ class Settings(BaseSettings):
     # OpenAI embeddings model (for future use in vector search etc.)
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
 
-    # AWS Bedrock (defaults tuned to Claude 3 Haiku in us-east-1)
+    # AWS Bedrock (defaults tuned to Amazon Nova 2 Sonic in us-east-1)
     AWS_BEDROCK_REGION: str = "us-east-1"
-    AWS_BEDROCK_MODEL_ID: str = "anthropic.claude-3-haiku-20240307-v1:0"
+    AWS_BEDROCK_MODEL_ID: str = "amazon.nova-2-sonic-v1:0"
     AWS_BEDROCK_MAX_TOKENS: int = 1000
     AWS_BEARER_TOKEN_BEDROCK: str = ""
 
@@ -112,6 +112,12 @@ class Settings(BaseSettings):
     # Performance Targets
     TARGET_EVAL_LATENCY_P95_SEC: float = 10.0
     TARGET_STT_LATENCY_P95_SEC: float = 5.0
+
+    # Rate Limiting (to prevent hammering external APIs)
+    GROQ_MIN_INTERVAL_SEC: float = 1.0
+    GROQ_MAX_REQUESTS_PER_MINUTE: int = 60
+    GEMINI_MIN_INTERVAL_SEC: float = 1.0
+    GEMINI_MAX_REQUESTS_PER_MINUTE: int = 60
 
     # Analytics
     ENABLE_ANALYTICS: bool = True

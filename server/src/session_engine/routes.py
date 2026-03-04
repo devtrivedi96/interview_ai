@@ -129,9 +129,9 @@ async def start_session(
             primary_language = str(tech_stack[0])
         preferred_roles = preferences.get("preferred_roles") or []
 
-    # 🔥 Generate First Question Using Bedrock with retry
+    # 🔥 Generate First Question Using Bedrock with single retry
     question_text = None
-    max_retries = 2
+    max_retries = 1  # Reduced from 2 to reduce API calls
     
     for attempt in range(max_retries):
         try:
@@ -201,11 +201,8 @@ async def get_next_question(
     if session.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    # Get actual count of questions already asked (check DB directly)
-    asked_questions = db.collection(Collections.SESSION_QUESTIONS).where(
-        "session_id", "==", session_id
-    ).stream()
-    actual_count = sum(1 for _ in asked_questions)
+    # Use the questions_count stored on session (more efficient than querying all)
+    actual_count = session.questions_count or 0
     
     if actual_count >= settings.MAX_QUESTIONS_PER_SESSION:
         logger.warning(f"Session {session_id} reached max questions: {actual_count}")
@@ -227,8 +224,8 @@ async def get_next_question(
                 primary_language = str(tech_stack[0])
             preferred_roles = preferences.get("preferred_roles") or []
 
-        # 🔥 Generate next question using Bedrock with timeout and retry
-        max_retries = 2
+        # 🔥 Generate next question using Bedrock with minimal retry
+        max_retries = 1  # Single attempt for subsequent questions to reduce API calls
         question_text = None
         
         for attempt in range(max_retries):
@@ -534,7 +531,7 @@ async def get_qa_history(
 
     try:
         # Fetch all questions for this session, ordered by creation
-        questions_docs = (
+        questions_docs = list(
             db.collection(Collections.SESSION_QUESTIONS)
             .where("session_id", "==", session_id)
             .stream()
@@ -543,6 +540,7 @@ async def get_qa_history(
         # Convert to list and deduplicate based on question_text (in case same question generated)
         questions_list = []
         seen_texts = set()
+        question_ids = []
         
         for q_doc in questions_docs:
             q_data = q_doc.to_dict()
@@ -555,36 +553,63 @@ async def get_qa_history(
                 continue
             
             seen_texts.add(question_text)
+            question_ids.append(question_id)
             questions_list.append((question_id, q_data))
 
+        # Batch fetch all answers for these questions (avoid N+1)
+        all_answers = {}
+        if question_ids:
+            answers_docs = list(
+                db.collection(Collections.ANSWERS)
+                .where("question_id", "in", question_ids if len(question_ids) == 1 else None)
+                .stream()
+            ) if len(question_ids) == 1 else []
+            
+            # For multiple questions, fetch all and filter
+            if len(question_ids) > 1:
+                all_answers_raw = list(db.collection(Collections.ANSWERS).stream())
+                answers_docs = [a for a in all_answers_raw if a.to_dict().get('question_id') in question_ids]
+            
+            answer_ids = []
+            for a_doc in answers_docs:
+                a_data = a_doc.to_dict()
+                q_id = a_data.get('question_id')
+                all_answers[q_id] = (a_doc.id, a_data)
+                answer_ids.append(a_doc.id)
+
+        # Batch fetch all evaluations for these answers (avoid N+1)
+        all_evaluations = {}
+        if answer_ids:
+            evals_docs = list(
+                db.collection(Collections.EVALUATIONS)
+                .where("answer_id", "in", answer_ids if len(answer_ids) == 1 else None)
+                .stream()
+            ) if len(answer_ids) == 1 else []
+            
+            # For multiple answers, fetch all and filter
+            if len(answer_ids) > 1:
+                all_evals_raw = list(db.collection(Collections.EVALUATIONS).stream())
+                evals_docs = [e for e in all_evals_raw if e.to_dict().get('answer_id') in answer_ids]
+            
+            for e_doc in evals_docs:
+                e_data = e_doc.to_dict()
+                answer_id = e_data.get('answer_id')
+                all_evaluations[answer_id] = e_data
+
+        # Build QA items from batched data
         qa_items = []
         for idx, (question_id, q_data) in enumerate(questions_list, 1):
-            # Fetch the user's answer for this question
-            answers_docs = (
-                db.collection(Collections.ANSWERS)
-                .where("question_id", "==", question_id)
-                .limit(1)
-                .stream()
-            )
-            
             user_answer = None
             evaluation = None
             
-            for a_doc in answers_docs:
-                a_data = a_doc.to_dict()
+            if question_id in all_answers:
+                answer_id, a_data = all_answers[question_id]
                 # The stored field is 'transcript', not 'answer_text'
                 user_answer = a_data.get("transcript") or a_data.get("answer_text")
                 
-                # Fetch evaluation if it exists
-                evals_docs = (
-                    db.collection(Collections.EVALUATIONS)
-                    .where("answer_id", "==", a_doc.id)
-                    .limit(1)
-                    .stream()
-                )
-                
-                for e_doc in evals_docs:
-                    e_data = e_doc.to_dict()
+                # Get evaluation if it exists
+                if answer_id in all_evaluations:
+                    e_data = all_evaluations[answer_id]
                     evaluation = {
                         "score": e_data.get("score"),
                         "feedback": e_data.get("feedback"),
@@ -592,7 +617,6 @@ async def get_qa_history(
                         "improvements": e_data.get("improvements", []),
                         "expected_answer": e_data.get("expected_answer"),
                     }
-                    break
             
             qa_items.append({
                 "question_number": idx,

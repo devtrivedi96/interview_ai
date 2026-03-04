@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useAuthStore } from "../stores/authStore";
 import { useProfileStore } from "../stores/profileStore";
 import PreferencesModal from "../components/PreferencesModal";
-import ThemeToggle from "../components/ThemeToggle";
 import {
   User,
   Edit2,
@@ -413,7 +412,6 @@ export default function Profile() {
               Manage your account and interview preferences
             </p>
           </div>
-          <ThemeToggle />
         </div>
 
         {/* User card */}

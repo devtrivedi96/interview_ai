@@ -159,6 +159,173 @@ async def generate_preparation_plan(
     return {"topics": topics, "plan": plan}
 
 
+@router.get("/preparation/suggested-topics")
+async def get_suggested_topics(
+    current_user: User = Depends(get_current_user_firebase),
+):
+    """Get AI-suggested preparation topics based on user profile."""
+    db = get_db()
+    user_doc = db.collection(Collections.USERS).document(current_user.id).get()
+    preferences = None
+    
+    if user_doc.exists:
+        user_data = user_doc.to_dict() or {}
+        preferences = (user_data.get("profile") or {}).get("preferences")
+    
+    generator = AIContentGenerator()
+    
+    # Extract preferences for topic suggestions
+    experience_level = "intermediate"
+    preferred_roles = None
+    tech_stack = None
+    
+    if preferences:
+        experience_level = preferences.get("experience_level", "intermediate")
+        preferred_roles = preferences.get("preferred_roles", None)
+        tech_stack = preferences.get("tech_stack", None)
+    
+    topics = generator.generate_suggested_topics(
+        experience_level=experience_level,
+        preferred_roles=preferred_roles,
+        tech_stack=tech_stack
+    )
+    
+    return {"topics": topics}
+
+
+class ConceptLearningRequest(BaseModel):
+    concept: str
+
+
+@router.post("/preparation/concept-learning")
+async def get_concept_learning(
+    req: ConceptLearningRequest,
+    current_user: User = Depends(get_current_user_firebase),
+):
+    """Get detailed learning material for a specific concept."""
+    concept = req.concept.strip()
+    if not concept or len(concept) < 2:
+        raise HTTPException(status_code=400, detail="Concept name must be at least 2 characters")
+    
+    if len(concept) > 100:
+        raise HTTPException(status_code=400, detail="Concept name must be less than 100 characters")
+    
+    generator = AIContentGenerator()
+    learning_material = generator.generate_concept_learning(concept=concept)
+    
+    return {
+        "concept": concept,
+        "learning_material": learning_material
+    }
+
+
+@router.get("/preparation/personalized-topics")
+async def get_personalized_topics(
+    current_user: User = Depends(get_current_user_firebase),
+):
+    """Get personalized preparation topics based on completed interview performance."""
+    db = get_db()
+    
+    # Get completed sessions for the user
+    sessions_query = (
+        db.collection(Collections.SESSIONS)
+        .where("user_id", "==", current_user.id)
+        .where("state", "==", "COMPLETE")
+        .order_by("completed_at", direction="DESCENDING")
+        .limit(20)
+    )
+    
+    completed_sessions = []
+    for doc in sessions_query.stream():
+        completed_sessions.append(doc.to_dict())
+    
+    # If no completed sessions, return None to indicate they should generate their own topics
+    if not completed_sessions:
+        return {"has_interview_history": False, "topics": None}
+    
+    # Analyze performance across different modes and difficulty levels
+    performance_analysis = {
+        "weak_areas": [],
+        "strong_areas": [],
+        "lower_scores": [],
+        "modes_attempted": set(),
+        "average_score": 0,
+    }
+    
+    total_score = 0
+    for session in completed_sessions:
+        mode = session.get("mode", "unknown")
+        score = session.get("total_score", 0)
+        performance_analysis["modes_attempted"].add(mode)
+        total_score += score
+        
+        if score < 60:
+            performance_analysis["lower_scores"].append({
+                "mode": mode,
+                "score": score,
+                "difficulty": session.get("difficulty_start", 3)
+            })
+    
+    if completed_sessions:
+        performance_analysis["average_score"] = total_score / len(completed_sessions)
+    
+    # Get user preferences
+    user_doc = db.collection(Collections.USERS).document(current_user.id).get()
+    preferences = None
+    if user_doc.exists:
+        user_data = user_doc.to_dict() or {}
+        preferences = (user_data.get("profile") or {}).get("preferences")
+    
+    # Generate personalized topics based on weak areas
+    generator = AIContentGenerator()
+    
+    # Build context for AI
+    context = f"""
+User has completed {len(completed_sessions)} interviews.
+Average score: {performance_analysis['average_score']:.1f}/100
+Modes attempted: {', '.join(performance_analysis['modes_attempted'])}
+"""
+    
+    if performance_analysis["lower_scores"]:
+        context += f"\nAreas needing improvement:\n"
+        for item in performance_analysis["lower_scores"][:5]:
+            context += f"- {item['mode']} (Score: {item['score']})\n"
+    
+    prompt = (
+        "Based on the user's interview performance, generate 5-7 highly personalized "
+        "preparation topics that address their weak areas. Each topic has 'name' and "
+        "'description' (max 80 chars). Focus on topics that will help them improve "
+        "their interview performance.\n\n"
+        f"Context: {context}\n\n"
+        "Return valid JSON array only."
+    )
+    
+    try:
+        data = generator._generate_json(prompt)
+        topics = data if isinstance(data, list) else data.get("topics", [])
+        if isinstance(topics, list) and len(topics) > 0:
+            return {
+                "has_interview_history": True,
+                "topics": topics[:7],
+                "performance_summary": {
+                    "completed_interviews": len(completed_sessions),
+                    "average_score": round(performance_analysis["average_score"], 1),
+                }
+            }
+    except Exception as e:
+        logger.warning(f"AI personalized topic generation failed: {e}")
+    
+    # Fallback: return None to indicate generic topics should be used
+    return {
+        "has_interview_history": True,
+        "topics": None,
+        "performance_summary": {
+            "completed_interviews": len(completed_sessions),
+            "average_score": round(performance_analysis["average_score"], 1),
+        }
+    }
+
+
 @router.get("/suggested-interview", response_model=SuggestedInterviewResponse)
 async def get_suggested_interview(
     current_user: User = Depends(get_current_user_firebase),
@@ -220,9 +387,10 @@ async def get_suggested_interview(
     difficulty = max(1, min(5, difficulty))
 
     # 3. Generate a few sample questions using BedrockService (with its fallbacks)
+    # Reduced from 3 to 2 to minimize API calls. Use cached static fallbacks instead.
     bedrock = BedrockService()
     sample_questions: List[str] = []
-    for _ in range(3):
+    for _ in range(2):
         try:
             q = bedrock.generate_question(
                 mode=mode_enum.value,
@@ -233,7 +401,7 @@ async def get_suggested_interview(
                 sample_questions.append(q)
         except Exception:
             # If Bedrock + fallbacks are unavailable, we still return what we have
-            continue
+            break  # Break early instead of retrying on failure
 
     if not sample_questions:
         # Last-resort static question to avoid empty UI

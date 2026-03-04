@@ -6,7 +6,6 @@ import api from "../services/api";
 import { useProfileStore } from "../stores/profileStore";
 import { useAuthStore } from "../stores/authStore";
 import PreferencesModal from "../components/PreferencesModal";
-import ThemeToggle from "../components/ThemeToggle";
 import {
   Award,
   BarChart3,
@@ -780,9 +779,7 @@ export default function Dashboard() {
         {/* ── Header ── */}
         <div className="db-header">
           <div>
-            <h1 className="db-title">
-              Interview<span>.</span>AI
-            </h1>
+            <h1 className="db-title">Interviewbit</h1>
             <p className="db-subtitle">
               Track your progress and sharpen your skills
             </p>
