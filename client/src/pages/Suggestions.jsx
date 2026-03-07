@@ -193,6 +193,26 @@ const STYLE = `
     display: flex; align-items: flex-start; gap: 8px;
   }
   .sg-footer-note svg { color: var(--accent); flex-shrink: 0; margin-top: 1px; }
+
+  @media (max-width: 640px) {
+    .sg-root {
+      padding: 24px 16px 64px;
+    }
+    .sg-card {
+      padding: 18px 16px;
+    }
+    .sg-card-head {
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .sg-source {
+      margin-left: 0;
+    }
+    .sg-item {
+      padding: 14px 12px;
+      gap: 10px;
+    }
+  }
 `;
 
 const DEFAULTS = [

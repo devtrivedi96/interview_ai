@@ -570,6 +570,35 @@ const STYLE = `
     font-size: 14px;
     color: var(--text-3);
   }
+
+  @media (max-width: 768px) {
+    .pp-root {
+      padding: 28px 16px 64px;
+    }
+    .pp-tabs {
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: thin;
+    }
+    .pp-tab {
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .pp-input-card {
+      padding: 22px 18px;
+    }
+    .pp-grid {
+      grid-template-columns: 1fr;
+    }
+    .pp-learning-header,
+    .pp-learning-content {
+      padding-left: 16px;
+      padding-right: 16px;
+    }
+    .pp-learning-content.collapsed {
+      padding: 0 16px;
+    }
+  }
 `;
 
 export default function Preparation() {

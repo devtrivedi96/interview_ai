@@ -311,6 +311,13 @@ const STYLE = `
     border-top: 1px solid var(--border);
   }
 
+  .pr-two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+
   /* Divider */
   .pr-divider { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
 
@@ -323,6 +330,31 @@ const STYLE = `
   .pr-root > *:nth-child(1) { animation-delay: .05s }
   .pr-root > *:nth-child(2) { animation-delay: .10s }
   .pr-root > *:nth-child(3) { animation-delay: .15s }
+
+  @media (max-width: 640px) {
+    .pr-root {
+      padding: 24px 16px 64px;
+    }
+    .pr-card {
+      padding: 20px 16px;
+    }
+    .pr-user-hero {
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .pr-meta-grid,
+    .pr-two-col {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    .pr-consent-opts {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .pr-save-btn {
+      justify-content: center;
+    }
+  }
 `;
 
 export default function Profile() {
@@ -562,14 +594,7 @@ export default function Profile() {
 
               <hr className="pr-divider" />
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 16,
-                  marginBottom: 18,
-                }}
-              >
+              <div className="pr-two-col">
                 <div className="pr-pref-section" style={{ marginBottom: 0 }}>
                   <div className="pr-pref-label">Experience Level</div>
                   <div className="pr-pref-value">

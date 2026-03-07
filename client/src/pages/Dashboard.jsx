@@ -592,6 +592,19 @@ const STYLE = `
   .db-root > *:nth-child(5) { animation-delay: .25s; }
   .db-root > *:nth-child(6) { animation-delay: .30s; }
   .db-root > *:nth-child(7) { animation-delay: .35s; }
+
+  @media (max-width: 640px) {
+    .db-root {
+      padding: 24px 14px 64px;
+    }
+    .db-card,
+    .stat-card {
+      padding: 16px;
+    }
+    .start-grid {
+      gap: 14px;
+    }
+  }
 `;
 
 const PIE_COLORS = ["#d4622a", "#2a6dd4", "#22a67a", "#a855f7", "#f59e0b"];

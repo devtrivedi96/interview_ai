@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { sessionService } from "../services/sessionService";
 import { Briefcase, Cpu, Layers3, Play, UserRound, Zap } from "lucide-react";
-import ThemeToggle from "../components/ThemeToggle";
 
 const STYLE = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
@@ -73,11 +72,6 @@ const STYLE = `
     gap: 20px;
   }
 
-  .theme-toggle-container {
-    position: absolute;
-    top: 36px;
-    right: 24px;
-  }
   .ic-title {
     font-family: var(--font-display);
     font-size: clamp(2rem, 4vw, 2.8rem);
@@ -364,6 +358,25 @@ const STYLE = `
   .ic-grid > *:nth-child(2) { animation: fadeUp .3s .16s ease both; }
   .ic-grid > *:nth-child(3) { animation: fadeUp .3s .22s ease both; }
   .ic-grid > *:nth-child(4) { animation: fadeUp .3s .28s ease both; }
+
+  @media (max-width: 640px) {
+    .ic-root {
+      padding: 24px 14px 64px;
+    }
+    .ic-header {
+      margin-top: 28px;
+      margin-bottom: 24px;
+    }
+    .ic-mode-card {
+      padding: 18px 16px;
+    }
+    .ic-settings {
+      padding: 20px 14px;
+    }
+    .ic-start-btn {
+      padding: 12px 16px;
+    }
+  }
 `;
 
 const MODE_META = {
@@ -476,10 +489,6 @@ export default function InterviewCenter() {
     <>
       <style>{STYLE}</style>
       <div className="ic-root">
-        <div className="theme-toggle-container">
-          <ThemeToggle />
-        </div>
-
         {/* Header */}
         <div className="ic-header">
           <div>

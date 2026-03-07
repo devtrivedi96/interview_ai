@@ -402,6 +402,26 @@ const STYLE = `
     box-shadow: 0 6px 16px rgba(212,98,42,.4);
   }
   .pub-main { flex: 1; }
+
+  @media (max-width: 640px) {
+    .pub-header-inner {
+      padding: 0 12px;
+      height: 58px;
+    }
+    .pub-logo-text {
+      font-size: 15px;
+    }
+    .pub-login {
+      display: none;
+    }
+    .pub-cta {
+      padding: 8px 12px;
+      font-size: 12px;
+    }
+    .topbar-logo-text {
+      font-size: 14px;
+    }
+  }
 `;
 
 const navItems = [

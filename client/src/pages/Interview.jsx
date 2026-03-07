@@ -906,6 +906,58 @@ const STYLE = `
     padding: 12px;
     font-style: italic;
   }
+
+  @media (max-width: 768px) {
+    .iv-root {
+      padding: 24px 14px 64px;
+    }
+    .iv-q-label {
+      font-size: 1.6rem;
+    }
+    .iv-question-box {
+      padding: 24px 18px;
+    }
+    .iv-question-text {
+      font-size: 1.05rem;
+      line-height: 1.65;
+    }
+    .iv-controls-bar {
+      gap: 12px;
+      padding: 14px;
+    }
+    .iv-record-area {
+      padding: 28px 16px;
+      gap: 16px;
+    }
+    .iv-record-btn {
+      width: 82px;
+      height: 82px;
+    }
+    .iv-score-hero {
+      padding: 30px 16px;
+    }
+    .iv-score-value {
+      font-size: 4rem;
+    }
+    .iv-feedback {
+      gap: 12px;
+    }
+    .iv-fb-card,
+    .iv-transcript,
+    .iv-answered-questions {
+      padding: 16px;
+    }
+    .iv-btn-primary,
+    .iv-btn-secondary {
+      width: 100%;
+      justify-content: center;
+      padding: 14px 18px;
+    }
+    .iv-actions {
+      width: 100%;
+      gap: 10px;
+    }
+  }
 `;
 
 const MAX_QUESTIONS_PER_SESSION = Number(

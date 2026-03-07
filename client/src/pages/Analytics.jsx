@@ -322,6 +322,25 @@ const STYLE = `
   .an-root > *:nth-child(4) { animation-delay: .20s }
   .an-root > *:nth-child(5) { animation-delay: .25s }
   .an-root > *:nth-child(6) { animation-delay: .30s }
+
+  @media (max-width: 640px) {
+    .an-root {
+      padding: 24px 16px 64px;
+    }
+    .an-header-content {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+    }
+    .an-period-select {
+      width: 100%;
+    }
+    .an-card,
+    .an-fb-card,
+    .an-stat {
+      padding: 18px;
+    }
+  }
 `;
 
 const CustomTooltip = ({ active, payload, label }) => {

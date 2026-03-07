@@ -492,20 +492,78 @@ const STYLES = `
 
   @media (max-width: 640px) {
     .register-root {
-      padding: 16px 12px;
+      padding: 72px 12px 16px;
+      align-items: flex-start;
     }
-    
+
+    .register-header {
+      margin-bottom: 24px;
+    }
+
+    .register-icon {
+      width: 64px;
+      height: 64px;
+      margin-bottom: 16px;
+      border-radius: 16px;
+    }
+
     .register-card {
-      padding: 24px;
+      padding: 20px 16px;
+      border-radius: 18px;
     }
-    
+
+    .register-form {
+      gap: 18px;
+    }
+
     .register-title {
-      font-size: 1.75rem;
+      font-size: 1.6rem;
     }
-    
+
+    .register-subtitle {
+      font-size: 0.92rem;
+    }
+
+    .input-field {
+      padding: 14px;
+      font-size: 15px;
+    }
+
+    .consent-panel {
+      padding: 14px;
+      border-radius: 12px;
+    }
+
+    .consent-checkbox {
+      gap: 10px;
+    }
+
+    .consent-checkbox input {
+      transform: scale(1);
+    }
+
+    .consent-label {
+      font-size: 13px;
+    }
+
+    .register-button {
+      padding: 14px 16px;
+      font-size: 15px;
+    }
+
+    .success-icon {
+      width: 84px;
+      height: 84px;
+      margin-bottom: 22px;
+    }
+
+    .success-title {
+      font-size: 1.6rem;
+    }
+
     .theme-toggle-container {
-      top: 16px;
-      right: 16px;
+      top: 12px;
+      right: 12px;
     }
   }
 `;
