@@ -1,32 +1,84 @@
 # Interviewbit Platform
 
-AI-powered interview practice platform with adaptive questioning, voice input, and structured answer evaluation.
+AI-powered interview practice platform for realistic mock interviews, voice-based answering, and structured AI feedback.
 
-## 1. Problem
-Candidates struggle to practice realistic interviews with high-quality, immediate feedback.
+## Component Documentation
 
-## 2. Solution
-Interviewbit simulates interview rounds end-to-end:
-- Generates contextual questions by interview mode and difficulty
-- Captures voice answers and transcribes them
-- Evaluates responses with rubric-based AI scoring
-- Shows strengths, improvements, and progress analytics
+- [Frontend Documentation](FRONTEND.md)
+- [Backend Documentation](BACKEND.md)
 
-## 3. Key Features
-- Adaptive interview flow with one-question-at-a-time state control
-- Voice + text answer support
-- Automated evaluation with actionable feedback
-- Session history, score trends, and profile preferences
-- AWS deployment pipeline for frontend delivery
+## Project Overview
 
-## 4. Architecture
+Interviewbit helps candidates practice interview rounds in a guided flow, get immediate rubric-based feedback, and track progress over time. The platform combines a React frontend, FastAPI backend, AI evaluation services, and analytics to simulate an end-to-end interview experience.
+
+## Main Features Offered
+
+- Adaptive interview flow with one-question-at-a-time progression
+- Voice and text answer support
+- AI-generated evaluation with strengths and improvement areas
+- Session summaries and per-question detailed feedback
+- Preparation and suggestion views before interviews
+- Analytics dashboard for tracking performance trends
+
+## Interview Pipeline
+
+### 1. Preparation
+Users begin by selecting interview mode/preferences and preparing for the target role.
+
+![Preparation](assets/Preparation.png)
+
+### 2. Interview Center
+The interview setup screen organizes session start options and interview configuration.
+
+![Interview Center](assets/Interview_center.png)
+
+### 3. Live Interview Session
+Candidates answer generated questions (voice/text) in a structured session flow.
+
+![Interview Session](assets/Interview.png)
+
+### 4. Evaluation
+After submission, AI evaluates responses using rubric-based criteria.
+
+![Evaluation](assets/Evaluation.png)
+
+### 5. Detailed Explanation
+The platform provides detailed explanation-level feedback for each answer.
+
+![Detailed Explanation](assets/Detailed_explanation.png)
+
+![Detailed Explanation 2](assets/Detailed_Explanation2.png)
+
+### 6. Strengths from the Interview
+Users receive highlighted strengths from the completed interview.
+
+![Interview Strengths](assets/Strength_of%20_giveninterview.png)
+
+### 7. Dashboard and Analytics
+Performance summaries and trends are visualized in dashboard and analytics views.
+
+![Dashboard](assets/Dashboard.png)
+
+![Dashboard Light](assets/Dashboard_lisght.png)
+
+![Analytics](assets/Analytics.png)
+
+## System Workflow
+
+High-level workflow of the overall platform:
+
+![System Workflow](assets/System_workflow.png)
+
+## Architecture
+
 - Frontend: React + Vite + Zustand + Tailwind
-- Backend: FastAPI (modular route + engine design)
-- Database: DynamoDB (Firestore-compatible access abstraction used in code)
-- AI Services: AWS Bedrock (evaluation/question support), STT integration in backend adapters
-- Deployment: GitHub Actions -> S3 + CloudFront (client)
+- Backend: FastAPI with modular routes and interview state engine
+- Data Layer: DynamoDB access abstraction (Firestore-compatible structure in code)
+- AI Services: AWS Bedrock for question/evaluation assistance + STT adapter
+- Deployment: GitHub Actions pipeline to S3 + CloudFront for frontend delivery
 
-## 5. API Surface (Main)
+## API Surface (Main)
+
 - `POST /api/v1/sessions` create session
 - `POST /api/v1/sessions/{session_id}/start` generate first question
 - `POST /api/v1/sessions/{session_id}/questions/{question_id}/answer` submit answer
@@ -34,8 +86,10 @@ Interviewbit simulates interview rounds end-to-end:
 - `GET /api/v1/sessions` list user sessions
 - `GET /api/v1/analytics/*` performance insights
 
-## 6. Local Run
+## Local Run
+
 ### Backend
+
 ```bash
 cd server
 pip install -r requirements.txt
@@ -43,13 +97,9 @@ uvicorn src.main:app --reload --port 8000
 ```
 
 ### Frontend
+
 ```bash
 cd client
 npm install
 npm run dev
 ```
-
-## 7. Hackathon Evaluation Notes
-- Built for live demo readiness: complete interview loop + scoring + analytics
-- Designed with practical deployment path on AWS
-- Prioritizes user experience (voice-first flow) and measurable outcomes (scores and trends)
