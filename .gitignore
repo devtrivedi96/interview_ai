@@ -75,3 +75,16 @@ lerna-debug.log*
 # Local databases
 *.db
 *.sqlite
+
+# Local deployment artifacts (do not track)
+aws/
+AWS_DEPLOYMENT_GUIDE.md
+DEPLOYMENT_FIXED.md
+DEPLOYMENT_SUCCESS.md
+FINAL_DEPLOYMENT_STEPS.md
+client/cloudfront-config.json
+client/configure-cloudfront.sh
+client/deploy-aws.sh
+client/fix-cloudfront.sh
+client/quick-deploy.sh
+client/setup-cloudfront.sh
