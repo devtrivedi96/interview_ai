@@ -89,4 +89,4 @@ client/fix-cloudfront.sh
 client/quick-deploy.sh
 client/setup-cloudfront.sh
 
-.git/workflows
+.github/workflows
