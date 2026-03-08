@@ -11,7 +11,7 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-from src.db.firebase_client import get_db, Collections
+from src.db.aws_client import get_db, Collections
 from src.db.models import (
     User,
     InterviewSession,

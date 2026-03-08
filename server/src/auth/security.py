@@ -6,7 +6,7 @@ from datetime import datetime
 
 from fastapi import Depends, Header, HTTPException, status
 
-from src.db.firebase_client import get_db, Collections
+from src.db.aws_client import get_db, Collections
 from src.db.models import User
 from src.utils.config import settings
 

@@ -10,7 +10,7 @@ from src.db.models import (
     InterviewSession, SessionQuestion, Question,
     AnswerEvaluation, InterviewMode
 )
-from src.db.firebase_client import get_db, Collections
+from src.db.aws_client import get_db, Collections
 from src.ai_evaluator.content_generator import AIContentGenerator
 from src.utils.config import settings
 
@@ -107,10 +107,9 @@ class InterviewEngine:
         limit: int = 2
     ) -> List[Tuple[SessionQuestion, Optional[AnswerEvaluation]]]:
         """Get recent questions with their evaluations"""
-        from google.cloud import firestore
         questions = self.db.collection(Collections.SESSION_QUESTIONS)\
             .where('session_id', '==', session_id)\
-            .order_by('created_at', direction=firestore.Query.DESCENDING)\
+            .order_by('created_at', direction='DESCENDING')\
             .limit(limit)\
             .get()
         

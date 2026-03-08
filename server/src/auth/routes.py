@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from src.auth.security import get_current_user_firebase, set_audio_consent_for_user
-from src.db.firebase_client import get_db, Collections
+from src.db.aws_client import get_db, Collections
 from src.db.models import User
 
 router = APIRouter()

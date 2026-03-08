@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from datetime import datetime, timedelta
 from typing import Optional
 
-from src.db.firebase_client import get_db, Collections
+from src.db.aws_client import get_db, Collections
 from src.db.models import User, InterviewSession
 from src.auth.security import get_current_user_firebase
 
@@ -26,11 +26,10 @@ async def get_user_progress(
         - Average scores by mode
         - Improvement trends
     """
-    from google.cloud import firestore
     db = get_db()
     sessions = db.collection(Collections.SESSIONS)\
         .where('user_id', '==', current_user.id)\
-        .order_by('created_at', direction=firestore.Query.DESCENDING)\
+        .order_by('created_at', direction='DESCENDING')\
         .limit(limit)\
         .get()
     
@@ -89,13 +88,12 @@ async def get_insights(
         - Strengths and weaknesses
         - Recommended focus areas
     """
-    from google.cloud import firestore
     db = get_db()
     cutoff_date = datetime.utcnow() - timedelta(days=days)
     sessions = db.collection(Collections.SESSIONS)\
         .where('user_id', '==', current_user.id)\
         .where('created_at', '>=', cutoff_date)\
-        .order_by('created_at', direction=firestore.Query.ASCENDING)\
+        .order_by('created_at', direction='ASCENDING')\
         .get()
     
     scores_over_time = []

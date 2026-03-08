@@ -20,6 +20,7 @@ class Collections:
     USERS = "users"
     SESSIONS = "sessions"
     SESSION_QUESTIONS = "session_questions"
+    ANSWERS = "answers"
     EVALUATIONS = "evaluations"
     QUESTIONS = "questions"
 
@@ -52,6 +53,13 @@ def _is_desc(direction: Any) -> bool:
 def _compare(left: Any, op: str, right: Any) -> bool:
     if op == "==":
         return left == right
+    if op == "in":
+        if right is None:
+            return False
+        try:
+            return left in right
+        except TypeError:
+            return False
     if op == ">=":
         return left is not None and left >= right
     if op == "<=":
@@ -127,6 +135,9 @@ class _InMemoryQuery:
 
         return docs
 
+    def stream(self):
+        return self.get()
+
 
 class _InMemoryCollection:
     def __init__(self, store, name):
@@ -171,6 +182,12 @@ class _InMemoryCollection:
 
     def order_by(self, field, direction="ASCENDING"):
         return _InMemoryQuery(self.store, self.name).order_by(field, direction)
+
+    def get(self):
+        return _InMemoryQuery(self.store, self.name).get()
+
+    def stream(self):
+        return self.get()
 
 
 def _build_in_memory_db():
@@ -243,6 +260,9 @@ class _DynamoQuery:
         except Exception:
             return []
 
+    def stream(self):
+        return self.get()
+
 
 class _DynamoCollection:
     def __init__(self, dynamo, name):
@@ -261,9 +281,18 @@ class _DynamoCollection:
                 self.id = doc_id
 
             def set(self, data, merge: bool = False):
-                item = _to_dynamodb_value(data.copy())
-                item["id"] = self.id
-                self._table.put_item(Item=item)
+                incoming = _to_dynamodb_value(data.copy())
+                if merge:
+                    try:
+                        existing = self._table.get_item(Key={"id": self.id}).get("Item") or {}
+                    except Exception:
+                        existing = {}
+                    existing.update(incoming)
+                    existing["id"] = self.id
+                    self._table.put_item(Item=existing)
+                else:
+                    incoming["id"] = self.id
+                    self._table.put_item(Item=incoming)
 
             def update(self, data):
                 key = {"id": self.id}
@@ -298,6 +327,12 @@ class _DynamoCollection:
 
     def order_by(self, field, direction="ASCENDING"):
         return _DynamoQuery(self.table).order_by(field, direction)
+
+    def get(self):
+        return _DynamoQuery(self.table).get()
+
+    def stream(self):
+        return self.get()
 
 
 class _DynamoDBWrapper:

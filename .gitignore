@@ -1,32 +1,29 @@
-# --- Environments & secrets ---
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+
+# Environment / secrets
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 *.local
-server/.env
-client/.env
-server/.env.example
+*.pem
+.aws/
 aws-credentials.json
 .aws-credentials
-.aws/
-aws/
-*.pem
-interview-aws-key.pem
+server/*firebase-adminsdk*.json
 
-# --- Node / frontend ---
-node_modules/
-client/node_modules/
-dist/
-dist-ssr/
-coverage/
-.vite/
-
-# --- Python / backend ---
+# Python (server)
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-.Python
+.python-version
 .venv/
 venv/
 env/
@@ -38,8 +35,18 @@ server/.venv/
 .coverage
 htmlcov/
 
-# --- Build artifacts ---
+# Node / frontend (client)
+node_modules/
+client/node_modules/
+dist/
+client/dist/
+dist-ssr/
+coverage/
+.vite/
+
+# Build outputs / archives
 build/
+aws/dist/
 downloads/
 eggs/
 .eggs/
@@ -53,9 +60,8 @@ wheels/
 .installed.cfg
 *.egg
 awscliv2.zip
-*.zip
 
-# --- Logs / runtime ---
+# Logs / runtime
 *.log
 logs/
 npm-debug.log*
@@ -66,16 +72,6 @@ lerna-debug.log*
 *.pid
 *.pid.lock
 
-# --- Local DB / OS / editor ---
+# Local databases
 *.db
 *.sqlite
-.DS_Store
-Thumbs.db
-.idea/
-*.swp
-*.swo
-*~
-
-server/.env.exampleserver/interview-33adc-firebase-adminsdk-fbsvc-b8056fc28f.json
-
-server/interview-33adc-firebase-adminsdk-fbsvc-b8056fc28f.json

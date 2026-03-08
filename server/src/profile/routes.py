@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
 from src.auth.security import get_current_user_firebase
-from src.db.firebase_client import get_db, Collections
+from src.db.aws_client import get_db, Collections
 from src.db.models import User, InterviewMode
 from src.ai.bedrock_service import BedrockService
 from src.ai_evaluator.content_generator import AIContentGenerator, DEFAULT_MODE_CARDS
